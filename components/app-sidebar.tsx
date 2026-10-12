@@ -34,6 +34,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarRail,
 } from "@/components/ui/sidebar"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { BotDialog } from "@/components/bot-dialog"
@@ -72,15 +73,15 @@ export function AppSidebar({ chats = [], ...props }: AppSidebarProps) {
 
   return (
     <>
-      <Sidebar {...props}>
+      <Sidebar collapsible="icon" {...props}>
         <SidebarHeader className="flex flex-col gap-2 p-2">
-          <div className="flex flex-row items-center justify-end">
+          <div className="flex flex-row items-center justify-end w-full group-data-[collapsible=icon]:justify-center">
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
                   <Button
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon"
                     className="size-8 rounded-lg bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                     aria-label="Create menu"
                   />
@@ -107,10 +108,10 @@ export function AppSidebar({ chats = [], ...props }: AppSidebarProps) {
             type="button"
             variant="ghost"
             onClick={() => setSearchOpen(true)}
-            className="h-8 w-full min-w-0 justify-between rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm font-normal text-muted-foreground shadow-none transition-colors hover:bg-muted hover:text-foreground dark:bg-input/30 dark:hover:bg-input/50 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+            className="h-8 w-full min-w-0 justify-between rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm font-normal text-muted-foreground shadow-none transition-colors hover:bg-muted hover:text-foreground dark:bg-input/30 dark:hover:bg-input/50 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-0! group-data-[collapsible=icon]:bg-transparent! group-data-[collapsible=icon]:dark:bg-transparent! group-data-[collapsible=icon]:text-foreground group-data-[collapsible=icon]:hover:bg-sidebar-accent! group-data-[collapsible=icon]:dark:hover:bg-sidebar-accent! group-data-[collapsible=icon]:hover:text-sidebar-accent-foreground!"
           >
             <div className="flex items-center gap-2 group-data-[collapsible=icon]:gap-0">
-              <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+              <SearchIcon className="size-4 shrink-0" />
               <span className="group-data-[collapsible=icon]:hidden">Search</span>
             </div>
             <Kbd className="group-data-[collapsible=icon]:hidden text-[10px] tracking-widest font-mono">
@@ -120,9 +121,9 @@ export function AppSidebar({ chats = [], ...props }: AppSidebarProps) {
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup>
+          <SidebarGroup className="group-data-[collapsible=icon]:p-0">
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1">
                 {chats.map((chat) => {
                   const bot = chat.members[0]?.bot
                   const name = chat.name || bot?.name || "Chat"
@@ -135,11 +136,12 @@ export function AppSidebar({ chats = [], ...props }: AppSidebarProps) {
                       <SidebarMenuButton
                         render={<Link href={`/chats/${chat.id}`} />}
                         isActive={isActive}
-                        className="h-auto items-start gap-3 p-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5"
+                        tooltip={name}
+                        className="h-auto items-start gap-3 p-2 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center"
                       >
                         <ChatAvatar
                           seed={bot?.avatar || bot?.name || chat.id}
-                          className="size-8 shrink-0 rounded-lg mt-0.5"
+                          className="size-8 shrink-0 rounded-lg mt-0.5 group-data-[collapsible=icon]:size-6 group-data-[collapsible=icon]:mt-0"
                         />
                         <div className="flex flex-1 min-w-0 flex-col gap-0.5 overflow-hidden text-left group-data-[collapsible=icon]:hidden">
                           <div className="flex items-center justify-between gap-2">
@@ -169,12 +171,12 @@ export function AppSidebar({ chats = [], ...props }: AppSidebarProps) {
         </SidebarContent>
 
         <SidebarFooter>
-          <SidebarMenu>
+          <SidebarMenu className="group-data-[collapsible=icon]:items-center">
             <SidebarMenuItem>
               <SidebarMenuButton
                 size="lg"
                 render={<div />}
-                className="h-12 w-full p-0 cursor-pointer"
+                className="h-12 w-full p-0 cursor-pointer group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!"
               >
                 <UserButton
                   showName
@@ -200,6 +202,8 @@ export function AppSidebar({ chats = [], ...props }: AppSidebarProps) {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
+
+        <SidebarRail />
       </Sidebar>
 
       <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
