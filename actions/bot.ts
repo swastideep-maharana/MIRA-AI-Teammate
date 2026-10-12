@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 import { nanoid } from "nanoid"
+import { and, eq, inArray } from "drizzle-orm"
 import { db } from "@/db"
 import {
   bots,
@@ -16,7 +17,7 @@ import {
 export async function createBot(data: BotInsert): Promise<Bot> {
   const { isAuthenticated, userId } = await auth()
 
-  if (!userId) {
+  if (!isAuthenticated || !userId) {
     throw new Error("Unauthorized")
   }
 
@@ -61,3 +62,74 @@ export async function createBot(data: BotInsert): Promise<Bot> {
 
   return newBot
 }
+
+export async function updateBot(id: string, data: BotInsert): Promise<Bot> {
+  const { isAuthenticated, userId } = await auth()
+
+  if (!isAuthenticated || !userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const validated = botInsertSchema.parse(data)
+
+  const updatedRows = await db
+    .update(bots)
+    .set({
+      name: validated.name,
+      avatar: validated.avatar,
+      job: validated.job,
+      instructions: validated.instructions?.trim() || null,
+    })
+    .where(and(eq(bots.id, id), eq(bots.userId, userId)))
+    .returning()
+
+  if (updatedRows.length === 0) {
+    throw new Error("Bot not found or unauthorized")
+  }
+
+  const updatedBot = updatedRows[0]
+
+  revalidatePath("/")
+
+  return updatedBot
+}
+
+export async function deleteBot(id: string): Promise<void> {
+  const { isAuthenticated, userId } = await auth()
+
+  if (!isAuthenticated || !userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const memberships = await db.query.chatMembers.findMany({
+    where: eq(chatMembers.botId, id),
+    with: {
+      chat: true,
+    },
+  })
+
+  const deletedRows = await db
+    .delete(bots)
+    .where(and(eq(bots.id, id), eq(bots.userId, userId)))
+    .returning()
+
+  if (deletedRows.length === 0) {
+    throw new Error("Bot not found or unauthorized")
+  }
+
+  const directChatIds = memberships
+    .filter(
+      (m) => m.chat && m.chat.userId === userId && m.chat.kind === "direct"
+    )
+    .map((m) => m.chatId)
+
+  if (directChatIds.length > 0) {
+    await db
+      .delete(chats)
+      .where(and(inArray(chats.id, directChatIds), eq(chats.userId, userId)))
+  }
+
+  revalidatePath("/")
+}
+
+
