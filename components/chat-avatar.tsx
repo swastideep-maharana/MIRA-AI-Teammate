@@ -17,14 +17,25 @@ export interface ChatAvatarProps {
 
 export function ChatAvatar({
   seed,
-  animated = false,
+  animated = true,
   className,
   alt,
 }: ChatAvatarProps) {
   const src = useMemo(() => {
     const avatar = new Avatar(style, {
       seed,
-      ...(animated ? { tags: ["animation"] } : {}),
+      backgroundColor: [],
+      ...(animated
+        ? {
+            animationVariant: [
+              "fastest",
+              "fast",
+              "medium",
+              "slow",
+              "slowest",
+            ],
+          }
+        : {}),
     })
     return avatar.toDataUri()
   }, [seed, animated])
@@ -36,7 +47,7 @@ export function ChatAvatar({
       width={32}
       height={32}
       unoptimized
-      className={cn("size-8 rounded-full", className)}
+      className={cn("size-8", className)}
     />
   )
 }

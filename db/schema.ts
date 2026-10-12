@@ -15,6 +15,7 @@ export const bots = pgTable(
       .notNull()
       .$defaultFn(() => nanoid()),
     job: text("job").notNull(),
+    instructions: text("instructions"),
     sandboxId: text("sandbox_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -26,7 +27,9 @@ export const botInsertSchema = createInsertSchema(bots, {
     schema.min(1, "Name is required").max(64, "Name is too long").trim(),
   job: (schema) =>
     schema.min(1, "Job is required").max(256, "Job is too long").trim(),
-  avatar: (schema) => schema.trim(),
+  instructions: (schema) =>
+    schema.max(1024, "Instructions are too long").trim().optional(),
+  avatar: (schema) => schema.min(1, "Avatar is required").trim(),
 }).omit({
   id: true,
   userId: true,
