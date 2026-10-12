@@ -128,3 +128,16 @@
     @apply font-sans;
     }
 }
+
+/* Clerk UI Customization */
+.cl-internal-b3fm6y,
+.cl-dev-mode-badge,
+.cl-footer__logo,
+[data-localization-key*="securedByClerk"],
+[data-localization-key*="developmentMode"] {
+  display: none !important;
+}
+
+.cl-footerAction {
+  border-top: none !important;
+}
