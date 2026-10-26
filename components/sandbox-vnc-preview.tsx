@@ -2,15 +2,13 @@
 
 import * as React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
-import { RotateCw, Maximize2, X, AlertCircle, Loader2 } from "lucide-react"
+import { RotateCw, Maximize2, Minimize2, X, AlertCircle, Loader2 } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
 } from "@/components/ui/dialog"
 import { getSandboxVncUrl } from "@/actions/sandbox"
 
@@ -106,7 +104,7 @@ export function SandboxVncPreview({
       </div>
 
       {/* Main preview container aligned at top */}
-      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-2 pb-6 overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-2 pb-6 min-h-0 overflow-y-auto">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -136,7 +134,7 @@ export function SandboxVncPreview({
               <div
                 className={cn(
                   isFullscreen
-                    ? "fixed inset-3 sm:inset-6 top-[57px] z-[60] rounded-b-xl overflow-hidden bg-black shadow-2xl flex flex-col"
+                    ? "fixed inset-2 sm:inset-5 z-[60] rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800/90 shadow-2xl flex flex-col"
                     : "absolute inset-0 w-full h-full"
                 )}
                 onKeyDown={(e) => {
@@ -144,13 +142,57 @@ export function SandboxVncPreview({
                   e.stopPropagation()
                 }}
               >
-                <iframe
-                  key={iframeKey}
-                  src={vncUrl}
-                  title={screenTitle}
-                  className="w-full h-full border-0 bg-black"
-                  allow="clipboard-read; clipboard-write; fullscreen"
-                />
+                {/* Fullscreen header with Minimize and Close buttons */}
+                {isFullscreen && (
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900 border-b border-zinc-800/80 shrink-0 select-none">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-sm font-medium text-zinc-100">
+                        {screenTitle}
+                      </span>
+                      <span className="text-[11px] font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
+                        Live
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Minimize Button */}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700/60 cursor-pointer shadow-xs"
+                        onClick={() => setIsFullscreen(false)}
+                        title="Minimize to panel"
+                      >
+                        <Minimize2 className="w-3.5 h-3.5" />
+                        <span>Minimize</span>
+                      </Button>
+
+                      {/* Close Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
+                        onClick={() => setIsFullscreen(false)}
+                        title="Close fullscreen"
+                      >
+                        <X className="w-4 h-4" />
+                        <span className="sr-only">Close</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* VNC Screen Content */}
+                <div className="flex-1 w-full h-full min-h-0 bg-black relative">
+                  <iframe
+                    key={iframeKey}
+                    src={vncUrl}
+                    title={screenTitle}
+                    className="w-full h-full border-0 bg-black"
+                    allow="clipboard-read; clipboard-write; fullscreen"
+                  />
+                </div>
               </div>
 
               {/* Click overlay for preview mode: clicking opens fullscreen */}
@@ -183,48 +225,15 @@ export function SandboxVncPreview({
         ) : null}
       </div>
 
-      {/* Fullscreen Dialog using @components/ui/dialog.tsx */}
+      {/* Fullscreen Dialog Overlay using @components/ui/dialog.tsx */}
       <Dialog
         open={isFullscreen}
         onOpenChange={handleOpenChange}
         disablePointerDismissal={true}
       >
-        <DialogContent
-          className="fixed inset-3 sm:inset-6 z-50 flex flex-col p-0 max-w-none w-auto h-auto bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl gap-0"
-          showCloseButton={false}
-          onKeyDown={(e) => {
-            // Stop keyboard events from propagating to dialog close handler
-            e.stopPropagation()
-          }}
-        >
-          {/* Dialog Header */}
-          <DialogHeader className="flex flex-row items-center justify-between px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/60 space-y-0 h-[48px] select-none">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <DialogTitle className="text-sm font-medium text-zinc-200">
-                {screenTitle}
-              </DialogTitle>
-            </div>
-            <DialogDescription className="sr-only">
-              Interactive fullscreen VNC session for {screenTitle}
-            </DialogDescription>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                onClick={() => setIsFullscreen(false)}
-                title="Exit fullscreen"
-              >
-                <X className="w-4 h-4" />
-                <span className="sr-only">Close</span>
-              </Button>
-            </div>
-          </DialogHeader>
-
-          {/* Dialog Body (where the persistent iframe positions itself) */}
-          <div className="flex-1 w-full h-full bg-black relative" />
-        </DialogContent>
+        <DialogPortal>
+          <DialogOverlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" />
+        </DialogPortal>
       </Dialog>
     </div>
   )
