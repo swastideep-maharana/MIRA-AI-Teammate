@@ -32,6 +32,24 @@ export async function createBot(data: BotInsert): Promise<Bot> {
   const sandbox = await daytona.create()
   const sandboxId = sandbox.id
 
+  // Create a blank MEMORY.md file in bot's sandbox on creation
+  try {
+    if (sandbox.state && sandbox.state !== "started") {
+      try {
+        await sandbox.start()
+      } catch {}
+    }
+    await sandbox.fs.uploadFile(
+      Buffer.from("# MEMORY\n\n", "utf-8"),
+      "MEMORY.md"
+    )
+  } catch (memError) {
+    console.warn(
+      `Failed to initialize MEMORY.md for sandbox ${sandboxId}:`,
+      memError
+    )
+  }
+
   let botRows: Bot[]
   try {
     const [insertedBotRows] = await db.batch([

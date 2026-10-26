@@ -39,6 +39,19 @@ export async function startChatSession(
     : undefined
   const bot = requestedBot ?? chatRecord?.members?.[0]?.bot
 
+  const isGroup =
+    chatRecord?.kind === "group" || (chatRecord?.members?.length ?? 0) > 1
+
+  const groupMembers = (chatRecord?.members ?? [])
+    .map((m) => m.bot)
+    .filter(Boolean)
+    .map((b) => ({
+      id: b.id,
+      name: b.name,
+      job: b.job,
+      instructions: b.instructions,
+    }))
+
   return start({
     ...params,
     clientData: {
@@ -48,6 +61,9 @@ export async function startChatSession(
       botInstructions:
         bot?.instructions ?? params.clientData?.botInstructions ?? "",
       sandboxId: bot?.sandboxId ?? params.clientData?.sandboxId ?? "",
+      isGroup,
+      chatName: chatRecord?.name ?? params.clientData?.chatName ?? "Group Chat",
+      groupMembers,
     },
   })
 }

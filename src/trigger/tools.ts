@@ -2,8 +2,20 @@ import { tool } from "ai"
 import { z } from "zod"
 import { getDaytona } from "../../lib/daytona"
 
+export interface BotTeammate {
+  id: string
+  name: string
+  job: string
+  instructions?: string | null
+}
+
 export interface DaytonaToolContext {
   sandboxId?: string
+  botId?: string
+  botName?: string
+  isGroup?: boolean
+  chatName?: string
+  groupMembers?: BotTeammate[]
 }
 
 export function createDaytonaTools(context?: DaytonaToolContext) {
@@ -409,6 +421,215 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
           value: output?.success
             ? "Screenshot captured and rendered in chat for the user."
             : `Failed to show screen: ${output?.error}`,
+        }
+      },
+    }),
+    handoff: tool({
+      description:
+        "Hand off or transfer the user request to another AI teammate in this group chat if their role, skills, or expertise are better suited for the user's prompt.",
+      inputSchema: z.object({
+        targetBotId: z
+          .string()
+          .optional()
+          .describe("The ID of the teammate bot to hand off to (if known)."),
+        targetBotName: z
+          .string()
+          .describe(
+            "The exact name of the teammate bot in the group chat to hand off to."
+          ),
+        reason: z
+          .string()
+          .describe(
+            "Clear explanation of why this teammate is better suited for the user's request."
+          ),
+        contextMessage: z
+          .string()
+          .optional()
+          .describe(
+            "A summary of what the user needs or specific instructions/context for the teammate."
+          ),
+      }),
+      execute: async ({ targetBotId, targetBotName, reason, contextMessage }) => {
+        const members = context?.groupMembers || []
+        const currentBotId = context?.botId
+        const currentBotName = context?.botName?.toLowerCase()
+
+        // Filter out current bot
+        const availableTeammates = members.filter((m) => {
+          if (currentBotId && m.id === currentBotId) return false
+          if (currentBotName && m.name.toLowerCase() === currentBotName) return false
+          return true
+        })
+
+        if (!context?.isGroup && availableTeammates.length === 0) {
+          return {
+            success: false,
+            error: "Handoff is only available in group chats with other teammates.",
+          }
+        }
+
+        // Match target bot by id or name
+        const targetBot = availableTeammates.find(
+          (m) =>
+            (targetBotId && m.id === targetBotId) ||
+            m.name.toLowerCase() === targetBotName.toLowerCase() ||
+            m.name.toLowerCase().includes(targetBotName.toLowerCase()) ||
+            targetBotName.toLowerCase().includes(m.name.toLowerCase())
+        )
+
+        if (!targetBot) {
+          const list = availableTeammates
+            .map((m) => `${m.name} (${m.job})`)
+            .join(", ")
+          return {
+            success: false,
+            error: `Teammate "${targetBotName}" not found in this group chat. Available teammates: ${list || "none"}.`,
+          }
+        }
+
+        return {
+          success: true,
+          handedOff: true,
+          fromBot: {
+            id: context?.botId,
+            name: context?.botName,
+          },
+          targetBot: {
+            id: targetBot.id,
+            name: targetBot.name,
+            job: targetBot.job,
+          },
+          reason,
+          contextMessage: contextMessage || null,
+        }
+      },
+      toModelOutput: ({ output }: { output: any }) => {
+        if (!output?.success) {
+          return {
+            type: "text",
+            value: `Handoff failed: ${output?.error}`,
+          }
+        }
+        return {
+          type: "text",
+          value: `Handoff initiated successfully to ${output.targetBot.name} (${output.targetBot.job}). Reason: ${output.reason}. Now write your response to the user: politely explain that you are handing this over to ${output.targetBot.name} because their skills/role match this request, and let the user know they can continue with ${output.targetBot.name}.`,
+        }
+      },
+    }),
+    getMemory: tool({
+      description:
+        "Retrieve the bot's persistent memory file (MEMORY.md) from the sandbox. Use this to recall personal notes, user secrets, facts, project details, or preferences shared in past or 1:1 direct conversations.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        try {
+          const sandbox = await getSandbox()
+          try {
+            const buffer = await sandbox.fs.downloadFile("MEMORY.md")
+            const memory = buffer.toString("utf-8")
+            return {
+              success: true,
+              memory,
+            }
+          } catch {
+            const initial = "# MEMORY\n\n"
+            try {
+              await sandbox.fs.uploadFile(
+                Buffer.from(initial, "utf-8"),
+                "MEMORY.md"
+              )
+            } catch {}
+            return {
+              success: true,
+              memory: initial,
+            }
+          }
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error?.message || String(error),
+          }
+        }
+      },
+      toModelOutput: ({ output }: { output: any }) => {
+        if (!output?.success) {
+          return {
+            type: "text",
+            value: `Failed to read memory: ${output?.error}`,
+          }
+        }
+        return {
+          type: "text",
+          value: output.memory ? output.memory : "(Memory is currently empty.)",
+        }
+      },
+    }),
+
+    setMemory: tool({
+      description:
+        "Save, update, or append information to the bot's persistent memory file (MEMORY.md) in the sandbox. ALWAYS call this tool whenever the user tells you a secret, preference, personal detail, project context, or asks you to remember something so that you can remember it forever across 1:1 and group chats.",
+      inputSchema: z.object({
+        content: z
+          .string()
+          .describe(
+            "The information, secret, fact, note, or preference to record into memory."
+          ),
+        mode: z
+          .enum(["append", "replace"])
+          .default("append")
+          .describe(
+            "Whether to append to the existing memory or replace it entirely. Defaults to 'append'."
+          ),
+      }),
+      execute: async ({ content, mode = "append" }) => {
+        try {
+          const sandbox = await getSandbox()
+          let existing = ""
+          try {
+            const buffer = await sandbox.fs.downloadFile("MEMORY.md")
+            existing = buffer.toString("utf-8")
+          } catch {
+            existing = "# MEMORY\n\n"
+          }
+
+          let newContent = ""
+          if (mode === "replace") {
+            newContent = content.trim() ? `${content.trim()}\n` : "# MEMORY\n\n"
+          } else {
+            const trimmedExisting = existing.trim()
+            const timestamp = new Date().toISOString().split("T")[0]
+            const entry = `- [${timestamp}] ${content.trim()}`
+            newContent = trimmedExisting
+              ? `${trimmedExisting}\n${entry}\n`
+              : `# MEMORY\n\n${entry}\n`
+          }
+
+          await sandbox.fs.uploadFile(
+            Buffer.from(newContent, "utf-8"),
+            "MEMORY.md"
+          )
+
+          return {
+            success: true,
+            updatedMemory: newContent,
+          }
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error?.message || String(error),
+          }
+        }
+      },
+      toModelOutput: ({ output }: { output: any }) => {
+        if (!output?.success) {
+          return {
+            type: "text",
+            value: `Failed to update memory: ${output?.error}`,
+          }
+        }
+        return {
+          type: "text",
+          value:
+            "Memory updated successfully in MEMORY.md. You will remember this across 1:1 and group chats.",
         }
       },
     }),

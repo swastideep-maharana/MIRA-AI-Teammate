@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { GroupChatAvatar } from "@/components/group-chat-avatar"
 import { BotDialog } from "@/components/bot-dialog"
+import { GroupChatDialog } from "@/components/group-chat-dialog"
 import type { ChatWithMembers } from "@/queries/chats"
 import { cn } from "@/lib/utils"
 
@@ -55,18 +56,29 @@ export function ChatHeader({
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
       {isGroup ? (
-        <div className="flex items-center gap-2.5">
-          <GroupChatAvatar
-            bots={chat.members?.map((m) => m.bot)}
-            className="size-6 rounded-md shrink-0"
-          />
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-foreground">{name}</span>
-            <span className="text-xs text-muted-foreground font-normal">
-              ({chat.members?.length ?? 0})
-            </span>
-          </div>
-        </div>
+        <GroupChatDialog
+          chat={chat}
+          onUpdated={() => router.refresh()}
+          onDeleted={() => {
+            router.push("/")
+            router.refresh()
+          }}
+          trigger={
+            <Button
+              variant="ghost"
+              className="h-auto -ml-2 gap-2 px-2 py-1 text-sm font-medium text-foreground hover:bg-muted/50"
+            >
+              <GroupChatAvatar
+                bots={chat.members?.map((m) => m.bot)}
+                className="size-5 rounded-sm shrink-0"
+              />
+              <span className="font-semibold">{name}</span>
+              <span className="text-xs text-muted-foreground font-normal">
+                ({chat.members?.length ?? 0})
+              </span>
+            </Button>
+          }
+        />
       ) : bot ? (
         <BotDialog
           bot={bot}

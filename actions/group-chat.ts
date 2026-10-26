@@ -60,3 +60,92 @@ export async function createGroupChat(input: CreateGroupChatInput) {
 export async function getUserBotsAction() {
   return getUserBots()
 }
+
+export const updateGroupChatSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Group name is required")
+    .max(64, "Name is too long")
+    .trim(),
+  botIds: z.array(z.string()).min(1, "Select at least one bot"),
+})
+
+export type UpdateGroupChatInput = z.infer<typeof updateGroupChatSchema>
+
+export async function updateGroupChat(
+  chatId: string,
+  input: UpdateGroupChatInput
+) {
+  const { userId } = await auth()
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const { name, botIds } = updateGroupChatSchema.parse(input)
+
+  const chat = await db.query.chats.findFirst({
+    where: and(eq(chats.id, chatId), eq(chats.userId, userId)),
+  })
+
+  if (!chat) {
+    throw new Error("Chat not found")
+  }
+
+  if (chat.kind !== "group") {
+    throw new Error("Cannot edit members of a direct chat")
+  }
+
+  const userBots = await db.query.bots.findMany({
+    where: and(eq(bots.userId, userId), inArray(bots.id, botIds)),
+  })
+
+  if (userBots.length === 0) {
+    throw new Error("No valid bots selected")
+  }
+
+  await db
+    .update(chats)
+    .set({ name })
+    .where(and(eq(chats.id, chatId), eq(chats.userId, userId)))
+
+  await db.delete(chatMembers).where(eq(chatMembers.chatId, chatId))
+
+  await db.insert(chatMembers).values(
+    userBots.map((bot) => ({
+      chatId,
+      botId: bot.id,
+    }))
+  )
+
+  revalidatePath("/")
+  revalidatePath(`/chats/${chatId}`)
+
+  return { success: true }
+}
+
+export async function deleteGroupChat(chatId: string) {
+  const { userId } = await auth()
+  if (!userId) {
+    throw new Error("Unauthorized")
+  }
+
+  const chat = await db.query.chats.findFirst({
+    where: and(eq(chats.id, chatId), eq(chats.userId, userId)),
+  })
+
+  if (!chat) {
+    throw new Error("Chat not found")
+  }
+
+  if (chat.kind !== "group") {
+    throw new Error("Cannot delete direct chat here")
+  }
+
+  await db
+    .delete(chats)
+    .where(and(eq(chats.id, chatId), eq(chats.userId, userId)))
+
+  revalidatePath("/")
+
+  return { success: true }
+}

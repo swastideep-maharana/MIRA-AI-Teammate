@@ -68,13 +68,16 @@ import {
   MousePointerClickIcon,
   MousePointerIcon,
   ArrowUpDownIcon,
+  ArrowRightLeftIcon,
   KeyboardIcon,
   MonitorIcon,
   DownloadIcon,
   WrenchIcon,
+  BrainIcon,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Spinner } from "@/components/ui/spinner"
+import { Badge } from "@/components/ui/badge"
 
 export interface ChatProps {
   chatId: string
@@ -129,6 +132,14 @@ export function ChatInterface({ chatId, bot, chat, bots = [] }: ChatProps) {
       botJob: selectedBot?.job ?? "AI Assistant",
       botInstructions: selectedBot?.instructions ?? "",
       sandboxId: selectedBot?.sandboxId ?? "",
+      isGroup,
+      chatName: chat?.name ?? (isGroup ? "Group Chat" : undefined),
+      groupMembers: memberBots.map((b) => ({
+        id: b.id,
+        name: b.name,
+        job: b.job,
+        instructions: b.instructions ?? undefined,
+      })),
     },
   })
 
@@ -140,9 +151,17 @@ export function ChatInterface({ chatId, bot, chat, bots = [] }: ChatProps) {
         botJob: selectedBot.job,
         botInstructions: selectedBot.instructions ?? "",
         sandboxId: selectedBot.sandboxId ?? "",
+        isGroup,
+        chatName: chat?.name ?? (isGroup ? "Group Chat" : undefined),
+        groupMembers: memberBots.map((b) => ({
+          id: b.id,
+          name: b.name,
+          job: b.job,
+          instructions: b.instructions ?? undefined,
+        })),
       })
     }
-  }, [selectedBotId, selectedBot, transport])
+  }, [selectedBotId, selectedBot, transport, isGroup, chat, memberBots])
 
   const { messages: initialMessages, isLoading } = useLoadTranscript(
     chatId,
@@ -206,6 +225,27 @@ function ChatView({
   const botAvatar = selectedBot?.avatar || selectedBot?.name || bot?.avatar || bot?.name || chatId
   const isGenerating = status === "submitted" || status === "streaming"
 
+  // Automatically switch active bot in composer when a handoff finishes
+  React.useEffect(() => {
+    if (!messages.length) return
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg.role === "assistant") {
+      for (const part of lastMsg.parts) {
+        if (
+          isToolUIPart(part) &&
+          getToolName(part) === "handoff" &&
+          part.state === "output-available" &&
+          (part.output as any)?.targetBot?.id
+        ) {
+          const targetId = (part.output as any).targetBot.id
+          if (targetId && targetId !== selectedBotId) {
+            onSelectBot(targetId)
+          }
+        }
+      }
+    }
+  }, [messages, selectedBotId, onSelectBot])
+
   return (
     <div className="relative flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-background">
       <Conversation className="flex-1 min-h-0 overflow-y-auto">
@@ -235,68 +275,185 @@ function ChatView({
               }
             />
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex w-full gap-3 ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {message.role === "assistant" && (
-                  <ChatAvatar
-                    seed={botAvatar}
-                    className="size-7 rounded-sm shrink-0 mt-1 shadow-xs"
-                  />
-                )}
-                <Message
-                  from={message.role}
-                  className={
-                    message.role === "user" ? "max-w-[80%]" : "max-w-[90%]"
+            messages.map((message, messageIndex) => {
+              let msgBot: any = null
+              let userTargetBot: any = null
+
+              if (message.role === "assistant") {
+                const directBotId = (message as any).metadata?.botId
+                if (directBotId) {
+                  msgBot = bots.find((b) => b.id === directBotId)
+                }
+                if (!msgBot && (message as any).metadata?.botName) {
+                  msgBot = bots.find(
+                    (b) => b.name === (message as any).metadata?.botName
+                  )
+                }
+                if (!msgBot) {
+                  for (let i = messageIndex - 1; i >= 0; i--) {
+                    if (messages[i].role === "user") {
+                      const userTargetId = (messages[i] as any).metadata?.botId
+                      if (userTargetId) {
+                        msgBot = bots.find((b) => b.id === userTargetId)
+                      }
+                      if (!msgBot && (messages[i] as any).metadata?.botName) {
+                        msgBot = bots.find(
+                          (b) => b.name === (messages[i] as any).metadata?.botName
+                        )
+                      }
+                      break
+                    }
                   }
+                }
+                if (!msgBot) {
+                  msgBot = selectedBot || bots[0] || bot
+                }
+              } else if (message.role === "user" && isGroup) {
+                const directBotId = (message as any).metadata?.botId
+                if (directBotId) {
+                  userTargetBot = bots.find((b) => b.id === directBotId)
+                }
+                if (!userTargetBot && (message as any).metadata?.botName) {
+                  userTargetBot = bots.find(
+                    (b) => b.name === (message as any).metadata?.botName
+                  )
+                }
+                if (!userTargetBot) {
+                  for (let i = messageIndex + 1; i < messages.length; i++) {
+                    if (messages[i].role === "assistant") {
+                      const nextBotId = (messages[i] as any).metadata?.botId
+                      if (nextBotId) {
+                        userTargetBot = bots.find((b) => b.id === nextBotId)
+                      }
+                      if (!userTargetBot && (messages[i] as any).metadata?.botName) {
+                        userTargetBot = bots.find(
+                          (b) => b.name === (messages[i] as any).metadata?.botName
+                        )
+                      }
+                      break
+                    }
+                  }
+                }
+                if (!userTargetBot) {
+                  userTargetBot = selectedBot || bots[0] || bot
+                }
+              }
+
+              const msgBotAvatar = msgBot?.avatar || msgBot?.name || botAvatar
+              const msgBotName = msgBot?.name || botName
+
+              return (
+                <div
+                  key={message.id}
+                  className={`flex w-full gap-3 ${
+                    message.role === "user" ? "justify-end" : "justify-start"
+                  }`}
                 >
-                  <MessageContent className="w-full">
-                    {message.parts.map((part, index) => {
-                      if (part.type === "text") {
-                        if (!part.text?.trim()) return null
-                        return (
-                          <MessageResponse key={index}>
-                            {part.text}
-                          </MessageResponse>
-                        )
-                      }
+                  {message.role === "assistant" && (
+                    <ChatAvatar
+                      seed={msgBotAvatar}
+                      alt={msgBotName}
+                      className="size-7 rounded-sm shrink-0 mt-1 shadow-xs"
+                    />
+                  )}
+                  <div
+                    className={`flex flex-col ${
+                      message.role === "user"
+                        ? "items-end max-w-[80%]"
+                        : "items-start max-w-[90%]"
+                    }`}
+                  >
+                    {isGroup && message.role === "assistant" && (
+                      <span className="text-[11px] font-medium text-muted-foreground mb-1 pl-1 select-none">
+                        {msgBotName}
+                      </span>
+                    )}
+                    <Message
+                      from={message.role}
+                      className="w-full"
+                    >
+                      <MessageContent className="w-full">
+                        {message.parts.map((part, index) => {
+                          if (part.type === "text") {
+                            if (!part.text?.trim()) return null
+                            if (message.role === "user") {
+                              return (
+                                <div
+                                  key={index}
+                                  className="whitespace-pre-wrap break-words leading-relaxed"
+                                >
+                                  {isGroup && userTargetBot && index === 0 && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="inline-flex items-center gap-1 h-5 pl-1 pr-1.5 mr-1.5 align-middle text-[11px] font-medium bg-background/80 border border-border/60 text-foreground shrink-0 max-w-[140px] select-none"
+                                    >
+                                      <ChatAvatar
+                                        seed={
+                                          userTargetBot.avatar ||
+                                          userTargetBot.name
+                                        }
+                                        className="size-3.5 rounded-full shrink-0"
+                                      />
+                                      <span className="truncate max-w-[90px]">
+                                        @{userTargetBot.name}
+                                      </span>
+                                    </Badge>
+                                  )}
+                                  <span>{part.text}</span>
+                                </div>
+                              )
+                            }
 
-                      if (part.type === "reasoning") {
-                        return (
-                          <Reasoning
-                            key={index}
-                            isStreaming={part.state === "streaming"}
-                          >
-                            <ReasoningTrigger />
-                            <ReasoningContent>{part.text}</ReasoningContent>
-                          </Reasoning>
-                        )
-                      }
+                            return (
+                              <MessageResponse key={index}>
+                                {part.text}
+                              </MessageResponse>
+                            )
+                          }
 
-                      if (isToolUIPart(part)) {
-                        return <ToolPartView key={index} part={part} />
-                      }
+                          if (part.type === "reasoning") {
+                            return (
+                              <Reasoning
+                                key={index}
+                                isStreaming={part.state === "streaming"}
+                              >
+                                <ReasoningTrigger />
+                                <ReasoningContent>{part.text}</ReasoningContent>
+                              </Reasoning>
+                            )
+                          }
 
-                      return null
-                    })}
-                  </MessageContent>
-                </Message>
-              </div>
-            ))
+                          if (isToolUIPart(part)) {
+                            return (
+                              <ToolPartView
+                                key={index}
+                                part={part}
+                                onSelectBot={onSelectBot}
+                              />
+                            )
+                          }
+
+                          return null
+                        })}
+                      </MessageContent>
+                    </Message>
+                  </div>
+                </div>
+              )
+            })
           )}
 
           {status === "submitted" && (
             <div className="flex w-full items-center gap-3 text-muted-foreground text-sm pl-1">
               <ChatAvatar
-                seed={botAvatar}
+                seed={selectedBot?.avatar || selectedBot?.name || botAvatar}
+                alt={selectedBot?.name || botName}
                 className="size-7 rounded-sm shrink-0 shadow-xs"
               />
               <span className="inline-flex items-center gap-1.5 animate-pulse font-medium">
-                Thinking...
+                {isGroup && selectedBot?.name
+                  ? `${selectedBot.name} is thinking...`
+                  : "Thinking..."}
               </span>
             </div>
           )}
@@ -327,6 +484,15 @@ function ChatView({
                     botJob: selectedBot?.job,
                     botInstructions: selectedBot?.instructions ?? "",
                     sandboxId: selectedBot?.sandboxId ?? "",
+                    isGroup,
+                    chatName:
+                      chat?.name ?? (isGroup ? "Group Chat" : undefined),
+                    groupMembers: bots.map((b) => ({
+                      id: b.id,
+                      name: b.name,
+                      job: b.job,
+                      instructions: b.instructions ?? undefined,
+                    })),
                   },
                 }
               )
@@ -460,6 +626,24 @@ export function getToolDisplayInfo(toolName: string, input: any) {
         title: "Desktop Screen",
         icon: MonitorIcon,
       }
+    case "handoff":
+      return {
+        title: `Hand off to ${input?.targetBotName || "teammate"}`,
+        icon: ArrowRightLeftIcon,
+      }
+    case "getMemory":
+      return {
+        title: "Recall memory (MEMORY.md)",
+        icon: BrainIcon,
+      }
+    case "setMemory":
+      return {
+        title:
+          input?.mode === "replace"
+            ? "Update memory (MEMORY.md)"
+            : "Save to memory (MEMORY.md)",
+        icon: BrainIcon,
+      }
     default:
       return {
         title: toolName,
@@ -468,7 +652,13 @@ export function getToolDisplayInfo(toolName: string, input: any) {
   }
 }
 
-export function ToolPartView({ part }: { part: any }) {
+export function ToolPartView({
+  part,
+  onSelectBot,
+}: {
+  part: any
+  onSelectBot?: (botId: string) => void
+}) {
   const toolName = getToolName(part)
 
   // 1. viewScreen: "never rendered in chat"
@@ -476,7 +666,73 @@ export function ToolPartView({ part }: { part: any }) {
     return null
   }
 
-  // 2. showScreen: "rendered in chat"
+  // 2. handoff: specialized collaborative UI
+  if (toolName === "handoff") {
+    const targetName =
+      part.output?.targetBot?.name || part.input?.targetBotName || "Teammate"
+    const targetJob = part.output?.targetBot?.job || "AI Teammate"
+    const targetId = part.output?.targetBot?.id || part.input?.targetBotId
+    const reason = part.output?.reason || part.input?.reason
+    const isError =
+      part.state === "output-error" ||
+      (part.state === "output-available" && !part.output?.success)
+
+    if (isError) {
+      return (
+        <div className="my-2 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+          <ArrowRightLeftIcon className="size-4 shrink-0" />
+          <span>
+            Handoff error:{" "}
+            {part.errorText || part.output?.error || "Failed to hand off"}
+          </span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="my-3 overflow-hidden rounded-xl border border-primary/25 bg-primary/5 p-3.5 shadow-xs transition-all">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ArrowRightLeftIcon className="size-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-foreground">
+                  Task Handoff
+                </span>
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+                  to {targetName}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Role:{" "}
+                <span className="text-foreground font-medium">{targetJob}</span>
+              </p>
+            </div>
+          </div>
+          {onSelectBot && targetId && (
+            <button
+              type="button"
+              onClick={() => onSelectBot(targetId)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+            >
+              <ChatAvatar seed={targetName} className="size-3.5 rounded-xs" />
+              <span>Switch to {targetName}</span>
+            </button>
+          )}
+        </div>
+        {reason && (
+          <div className="mt-2.5 rounded-md bg-background/80 px-3 py-2 text-xs text-muted-foreground border border-border/50">
+            <span className="font-medium text-foreground">Reason: </span>
+            {reason}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // 3. showScreen: "rendered in chat"
   if (toolName === "showScreen") {
     if (part.state === "output-available" && part.output?.screenshot) {
       const screenshotData = `data:image/png;base64,${part.output.screenshot}`

@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { ClerkProvider } from "@clerk/nextjs"
 import { ui } from "@clerk/ui"
 import { shadcn } from "@clerk/ui/themes"
@@ -8,6 +9,22 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
+
+export const metadata: Metadata = {
+  title: "MIRA | AI Teammate Platform",
+  description:
+    "Multi-agent AI collaboration platform with cloud sandboxes and computer use.",
+  icons: {
+    icon: [
+      {
+        url: "/logo.svg",
+        type: "image/svg+xml",
+      },
+    ],
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
+  },
+}
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 

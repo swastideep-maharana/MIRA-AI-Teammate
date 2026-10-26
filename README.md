@@ -1,21 +1,182 @@
-# Next.js template
+# MIRA - AI Teammate Platform
 
-This is a Next.js template with shadcn/ui.
+MIRA is a multi-agent AI collaboration platform built with Next.js, Trigger.dev, and the Daytona Cloud SDK. It allows users to create specialized AI teammates, run isolated cloud sandboxes for autonomous computer use, engage in 1:1 and multi-agent group chats, and maintain persistent cross-chat memory.
 
-## Adding components
+---
 
-To add components to your app, run the following command:
+## Overview
 
-```bash
-npx shadcn@latest add button
+MIRA gives each AI teammate a dedicated cloud environment (Daytona sandbox) with full computer use capabilities (GUI interaction, terminal execution, filesystem access). Teammates can collaborate in group chats, autonomously hand off tasks to specialists, and retain memories across both private and group interactions.
+
+---
+
+## Features
+
+### 1. AI Teammate Management
+- Create custom AI bots with distinct names, roles, job descriptions, and custom instructions.
+- Dynamic avatar generation using the DiceBear Thumbs style.
+- Edit and update bot profiles and instructions at any time.
+- Deletion workflow that removes the bot, its associated direct chat, and cleans up its dedicated cloud sandbox.
+
+### 2. Isolated Cloud Sandboxes and Live Remote Desktop
+- Each bot is provisioned with a dedicated Daytona Cloud sandbox upon creation.
+- Integrated live remote desktop preview (noVNC) rendered in a collapsible, resizable side panel.
+- Fullscreen dialog view for the remote desktop with input capture, anti-blur scaling, and minimize/restore controls.
+- Automatic startup and health checking of the sandbox and its computer use stack (Xvfb, Xfce4, x11vnc, noVNC).
+
+### 3. Computer Use and Sandbox Tools
+Each agent has direct access to tools executed within its sandbox:
+- bash: Execute shell commands, install packages, and run background processes.
+- readFile: Inspect and read file contents from the sandbox filesystem.
+- writeFile: Create and modify files in the sandbox filesystem.
+- listFiles: Enumerate files and directories across the workspace.
+- mouseClick: Perform left, right, and double clicks at coordinate points.
+- mouseMove: Move the cursor to exact coordinates on the virtual display.
+- mouseScroll: Scroll vertically up or down at specific coordinates.
+- keyboardType: Type text into active windows or input elements.
+- keyboardPress: Send keyboard keys and hotkey combinations (such as Enter, Tab, Escape, Ctrl+C).
+- viewScreen: Capture screenshots internally for agent inspection (not rendered in chat).
+- showScreen: Capture and render screenshots directly into the user conversation.
+
+### 4. Cross-Chat Persistent Memory
+- Automatic initialization of a MEMORY.md file inside the bot's sandbox upon bot creation.
+- getMemory tool: Allows the bot to retrieve the latest contents of MEMORY.md.
+- setMemory tool: Allows the bot to append or update facts, user secrets, passwords, and preferences with timestamps.
+- Memory Preloading: The contents of MEMORY.md are automatically fetched and injected into the agent system prompt on every turn.
+- Continuity: Memories recorded in private 1:1 conversations persist and remain accessible when speaking with the agent in group chats.
+
+### 5. Multi-Agent Group Chats
+- Create group chats with custom names and multiple participating bot teammates.
+- Responsive Group Chat Avatar:
+  - 2 bots: overlapping horizontal pair.
+  - 3 bots: triangular arrangement.
+  - 4+ bots: 2x2 grid with avatar slots and a numeric overflow badge.
+- Bot-per-turn interaction model: Users choose which bot to address via an integrated composer selector.
+- Inline Tag Badges: User messages in group chats feature an inline badge displaying the targeted bot's avatar and name.
+- Responding Bot Attribution: Assistant messages render the responding bot's avatar and name label.
+- Group Chat Header Management: The header is an interactive button that opens an edit dialog to rename the group, add or remove bot members, or delete the group chat.
+
+### 6. Autonomous Task Handoff
+- handoff tool: Bots in group chats can autonomously delegate user requests to other teammates whose roles or skills are better suited.
+- Interactive Handoff UI: Renders a dedicated card displaying the target teammate, role, reason, and an instant switch action.
+- Automatic Composer Sync: The message composer automatically updates the active bot dropdown to the delegated teammate upon completion of the handoff turn.
+
+### 7. Realtime Streaming Chat Experience
+- Powered by Trigger.dev AI Chat agents and the Vercel AI SDK.
+- Streaming responses with real-time thinking states, reasoning dropdowns, and execution inspection.
+- Rich markdown rendering using Streamdown with code syntax highlighting, CJK support, mathematical equations, and Mermaid diagrams.
+
+---
+
+## Technology Stack
+
+### Frontend and Application Framework
+- Next.js 16 (App Router, Server Actions)
+- React 19 and React DOM 19
+- TypeScript 5
+- Tailwind CSS 4 with PostCSS
+- Base UI and Shadcn UI component primitives
+- Class Variance Authority (CVA)
+- Lucide React icon library
+- React Resizable Panels
+- DiceBear Core and DiceBear Thumbs style
+- Streamdown (with @streamdown/code, @streamdown/cjk, @streamdown/math, @streamdown/mermaid)
+- Shiki code highlighter
+- React Hook Form with Zod resolvers
+- Motion (Framer Motion)
+- Embla Carousel React
+- Recharts and XYFlow
+
+### Backend, Database, and Infrastructure
+- Neon Serverless PostgreSQL
+- Drizzle ORM and Drizzle Kit
+- Clerk Next.js (Authentication and user management)
+- Trigger.dev v3 (Background agent execution, task scheduling, realtime chat streaming)
+- Daytona SDK (Cloud sandboxes, container lifecycle, remote desktop services)
+
+### AI and LLM Integration
+- Vercel AI SDK (ai, @ai-sdk/react)
+- Google Generative AI Provider (@ai-sdk/google) running Gemini models (gemini-3-flash-preview)
+
+---
+
+## Architecture
+
+```
++--------------------------------------------------------------+
+|                       Next.js Client                         |
+|  - Chat Interface & Streamdown Markdown                      |
+|  - Multi-Agent Composer Selector                             |
+|  - Embedded noVNC Remote Desktop Panel                       |
+|  - Bot & Group Chat Dialogs                                  |
++------------------------------+-------------------------------+
+                               |
+                               | Server Actions / HTTP
+                               v
++--------------------------------------------------------------+
+|                      Next.js Backend                         |
+|  - Clerk Authentication                                      |
+|  - Neon PostgreSQL (Chats, Bots, Chat Members)               |
+|  - Trigger.dev Session Management & Token Minting            |
++------------------------------+-------------------------------+
+                               |
+                               | Trigger Task Dispatch
+                               v
++--------------------------------------------------------------+
+|                  Trigger.dev Background Agent                |
+|  - chat-agent Task with Gemini 3 Flash                       |
+|  - Dynamic System Prompt Generation                          |
+|  - Persistent Memory Auto-Preload                            |
+|  - Handoff & Tool Routing                                    |
++------------------------------+-------------------------------+
+                               |
+                               | Daytona SDK / API
+                               v
++--------------------------------------------------------------+
+|                   Daytona Cloud Sandboxes                    |
+|  - Isolated Linux Compute Runtime                            |
+|  - Persistent Filesystem & MEMORY.md                         |
+|  - Bash Execution & Development Tools                        |
+|  - Xvfb + Xfce4 + x11vnc + noVNC (Port 6080)                 |
++--------------------------------------------------------------+
 ```
 
-This will place the ui components in the `components` directory.
+---
 
-## Using components
+## Database Schema
 
-To use the components in your app, import them as follows:
+The database is managed with Drizzle ORM on Neon Serverless PostgreSQL:
 
-```tsx
-import { Button } from "@/components/ui/button";
-```
+### bots
+- id: Primary key (text nanoid)
+- userId: Clerk user identifier
+- name: Bot display name
+- avatar: Seed string for DiceBear avatar generation
+- job: Role or title (e.g. Frontend Engineer, DevOps Specialist)
+- instructions: Custom system guidelines
+- sandboxId: Associated Daytona sandbox identifier
+- createdAt: Timestamp
+
+### chats
+- id: Primary key (text nanoid)
+- userId: Clerk user identifier
+- kind: Enum ("direct" | "group")
+- name: Group chat name (null for direct chats)
+- lastMessagesPreview: Text preview of recent activity
+- lastMessageAt: Timestamp of latest message
+- createdAt: Timestamp
+
+### chat_members
+- chatId: Foreign key referencing chats.id (cascade delete)
+- botId: Foreign key referencing bots.id (cascade delete)
+- joinedAt: Timestamp
+
+
+### Prerequisites
+- Node.js 20 or higher
+- npm, pnpm, or yarn
+- Neon PostgreSQL database instance
+- Daytona Cloud account and API key
+- Trigger.dev v3 account and project
+- Clerk application keys
+- Google Gemini API key
