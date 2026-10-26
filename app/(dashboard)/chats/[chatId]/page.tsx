@@ -18,7 +18,6 @@ export default async function ChatPage({
 }) {
   const { chatId } = await params
   const { desktop } = await searchParams
-  const isDesktopOpen = desktop === "true"
 
   const chat = await getChat(chatId)
 
@@ -26,7 +25,11 @@ export default async function ChatPage({
     notFound()
   }
 
+  const isGroup = chat.kind === "group" || (chat.members?.length ?? 0) > 1
+  const isDesktopOpen = !isGroup && desktop === "true"
+
   const bot = chat.members?.[0]?.bot
+  const bots = chat.members?.map((m) => m.bot) ?? []
 
   return (
     <div className="flex flex-1 h-full min-h-0 overflow-hidden">
@@ -42,7 +45,12 @@ export default async function ChatPage({
           <div className="flex flex-1 flex-col h-full min-h-0 overflow-hidden">
             <ChatHeader chat={chat} isDesktopOpen={isDesktopOpen} />
             <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-              <ChatInterface chatId={chatId} bot={bot} />
+              <ChatInterface
+                chatId={chatId}
+                bot={bot}
+                chat={chat}
+                bots={bots}
+              />
             </div>
           </div>
         </ResizablePanel>

@@ -6,6 +6,7 @@ import { Monitor } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ChatAvatar } from "@/components/chat-avatar"
+import { GroupChatAvatar } from "@/components/group-chat-avatar"
 import { BotDialog } from "@/components/bot-dialog"
 import type { ChatWithMembers } from "@/queries/chats"
 import { cn } from "@/lib/utils"
@@ -25,14 +26,17 @@ export function ChatHeader({
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  const isGroup = chat.kind === "group" || (chat.members?.length ?? 0) > 1
   const bot = chat.members?.[0]?.bot
-  const name = bot?.name || chat.name || "Chat"
+  const name = isGroup ? (chat.name || "Group chat") : (bot?.name || chat.name || "Chat")
   const avatarSeed = bot?.avatar || bot?.name || chat.id
 
   const isDesktopOpenFromUrl = searchParams.get("desktop") === "true"
-  const isDesktopOpen = isDesktopOpenProp ?? isDesktopOpenFromUrl
+  const isDesktopOpen = !isGroup && (isDesktopOpenProp ?? isDesktopOpenFromUrl)
 
   const handleToggle = () => {
+    if (isGroup) return
+
     if (onToggleDesktop) {
       onToggleDesktop()
       return
@@ -50,7 +54,20 @@ export function ChatHeader({
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
-      {bot ? (
+      {isGroup ? (
+        <div className="flex items-center gap-2.5">
+          <GroupChatAvatar
+            bots={chat.members?.map((m) => m.bot)}
+            className="size-6 rounded-md shrink-0"
+          />
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-semibold text-foreground">{name}</span>
+            <span className="text-xs text-muted-foreground font-normal">
+              ({chat.members?.length ?? 0})
+            </span>
+          </div>
+        </div>
+      ) : bot ? (
         <BotDialog
           bot={bot}
           onUpdated={() => router.refresh()}
@@ -74,20 +91,24 @@ export function ChatHeader({
           <span className="text-sm font-medium">{name}</span>
         </div>
       )}
-      <Button
-        variant={isDesktopOpen ? "secondary" : "ghost"}
-        size="icon"
-        type="button"
-        onClick={handleToggle}
-        className={cn(
-          "size-8 text-muted-foreground hover:text-foreground transition-colors",
-          isDesktopOpen && "bg-muted text-foreground"
-        )}
-        aria-label="Toggle Desktop Panel"
-        aria-pressed={isDesktopOpen}
-      >
-        <Monitor className="size-4" />
-      </Button>
+
+      {/* Desktop panel option is hidden for group chats */}
+      {!isGroup && (
+        <Button
+          variant={isDesktopOpen ? "secondary" : "ghost"}
+          size="icon"
+          type="button"
+          onClick={handleToggle}
+          className={cn(
+            "size-8 text-muted-foreground hover:text-foreground transition-colors",
+            isDesktopOpen && "bg-muted text-foreground"
+          )}
+          aria-label="Toggle Desktop Panel"
+          aria-pressed={isDesktopOpen}
+        >
+          <Monitor className="size-4" />
+        </Button>
+      )}
     </header>
   )
 }

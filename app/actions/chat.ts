@@ -33,11 +33,16 @@ export async function startChatSession(
     },
   })
 
-  const bot = chatRecord?.members?.[0]?.bot
+  // If a specific botId was requested in clientData, find it among members; otherwise fallback to first member
+  const requestedBot = params.clientData?.botId
+    ? chatRecord?.members?.find((m) => m.botId === params.clientData?.botId)?.bot
+    : undefined
+  const bot = requestedBot ?? chatRecord?.members?.[0]?.bot
 
   return start({
     ...params,
     clientData: {
+      botId: bot?.id ?? params.clientData?.botId ?? "",
       botName: bot?.name ?? params.clientData?.botName ?? "AI Teammate",
       botJob: bot?.job ?? params.clientData?.botJob ?? "AI Assistant",
       botInstructions:

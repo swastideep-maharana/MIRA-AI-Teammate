@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createDaytonaTools } from "./tools";
 
 export const chatClientDataSchema = z.object({
+  botId: z.string().optional(),
   botName: z.string().optional(),
   botJob: z.string().optional(),
   botInstructions: z.string().optional(),

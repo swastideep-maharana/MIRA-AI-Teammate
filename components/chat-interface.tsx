@@ -32,7 +32,13 @@ import {
   PromptInputFooter,
   PromptInputTools,
   PromptInputSubmit,
+  PromptInputSelect,
+  PromptInputSelectTrigger,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
+  PromptInputSelectValue,
 } from "@/components/ai-elements/prompt-input"
+import { GroupChatAvatar } from "@/components/group-chat-avatar"
 import { isToolUIPart } from "ai"
 import {
   Tool,
@@ -73,27 +79,70 @@ import { Spinner } from "@/components/ui/spinner"
 export interface ChatProps {
   chatId: string
   bot?: {
+    id?: string | null
     name?: string | null
     avatar?: string | null
     job?: string | null
     instructions?: string | null
     sandboxId?: string | null
   } | null
+  chat?: {
+    id: string
+    kind: "direct" | "group"
+    name?: string | null
+  } | null
+  bots?: Array<{
+    id: string
+    name: string
+    avatar?: string | null
+    job: string
+    instructions?: string | null
+    sandboxId?: string | null
+  }>
 }
 
-export function ChatInterface({ chatId, bot }: ChatProps) {
+export function ChatInterface({ chatId, bot, chat, bots = [] }: ChatProps) {
+  const memberBots = React.useMemo(() => {
+    if (bots && bots.length > 0) return bots
+    if (bot) return [bot as any]
+    return []
+  }, [bots, bot])
+
+  const isGroup = chat?.kind === "group" || memberBots.length > 1
+
+  const [selectedBotId, setSelectedBotId] = React.useState<string>(() => {
+    return memberBots[0]?.id ?? bot?.id ?? ""
+  })
+
+  const selectedBot = React.useMemo(() => {
+    return memberBots.find((b) => b.id === selectedBotId) ?? memberBots[0] ?? bot
+  }, [memberBots, selectedBotId, bot])
+
   const transport = useTriggerChatTransport<typeof chatAgent>({
     task: "chat-agent",
     accessToken: ({ chatId }) => mintChatAccessToken(chatId),
     startSession: ({ chatId, clientData }) =>
       startChatSession({ chatId, clientData }),
     clientData: {
-      botName: bot?.name ?? "AI Teammate",
-      botJob: bot?.job ?? "AI Assistant",
-      botInstructions: bot?.instructions ?? "",
-      sandboxId: bot?.sandboxId ?? "",
+      botId: selectedBot?.id ?? "",
+      botName: selectedBot?.name ?? "AI Teammate",
+      botJob: selectedBot?.job ?? "AI Assistant",
+      botInstructions: selectedBot?.instructions ?? "",
+      sandboxId: selectedBot?.sandboxId ?? "",
     },
   })
+
+  React.useEffect(() => {
+    if (selectedBot && (transport as any).setClientData) {
+      ;(transport as any).setClientData({
+        botId: selectedBot.id,
+        botName: selectedBot.name,
+        botJob: selectedBot.job,
+        botInstructions: selectedBot.instructions ?? "",
+        sandboxId: selectedBot.sandboxId ?? "",
+      })
+    }
+  }, [selectedBotId, selectedBot, transport])
 
   const { messages: initialMessages, isLoading } = useLoadTranscript(
     chatId,
@@ -112,7 +161,12 @@ export function ChatInterface({ chatId, bot }: ChatProps) {
   return (
     <ChatView
       chatId={chatId}
-      bot={bot}
+      bot={selectedBot}
+      chat={chat}
+      bots={memberBots}
+      isGroup={isGroup}
+      selectedBotId={selectedBotId}
+      onSelectBot={setSelectedBotId}
       transport={transport}
       initialMessages={initialMessages}
     />
@@ -122,11 +176,21 @@ export function ChatInterface({ chatId, bot }: ChatProps) {
 function ChatView({
   chatId,
   bot,
+  chat,
+  bots,
+  isGroup,
+  selectedBotId,
+  onSelectBot,
   transport,
   initialMessages,
 }: {
   chatId: string
   bot?: ChatProps["bot"]
+  chat?: ChatProps["chat"]
+  bots: Array<any>
+  isGroup: boolean
+  selectedBotId: string
+  onSelectBot: (botId: string) => void
   transport: ReturnType<typeof useTriggerChatTransport>
   initialMessages: UIMessage[]
 }) {
@@ -137,8 +201,9 @@ function ChatView({
     resume: initialMessages.length > 0,
   })
 
-  const botName = bot?.name || "AI Teammate"
-  const botAvatar = bot?.avatar || bot?.name || chatId
+  const selectedBot = bots.find((b) => b.id === selectedBotId) ?? bot
+  const botName = selectedBot?.name || bot?.name || "AI Teammate"
+  const botAvatar = selectedBot?.avatar || selectedBot?.name || bot?.avatar || bot?.name || chatId
   const isGenerating = status === "submitted" || status === "streaming"
 
   return (
@@ -148,14 +213,23 @@ function ChatView({
           {messages.length === 0 ? (
             <ConversationEmptyState
               icon={
-                <ChatAvatar
-                  seed={botAvatar}
-                  className="size-12 rounded-xl mb-3 shadow-sm"
-                />
+                isGroup ? (
+                  <GroupChatAvatar
+                    bots={bots}
+                    className="size-14 rounded-2xl mb-3 shadow-sm"
+                  />
+                ) : (
+                  <ChatAvatar
+                    seed={botAvatar}
+                    className="size-12 rounded-xl mb-3 shadow-sm"
+                  />
+                )
               }
-              title={`Talk with ${botName}`}
+              title={isGroup ? (chat?.name || "Group Chat") : `Talk with ${botName}`}
               description={
-                bot?.job
+                isGroup
+                  ? `Featuring ${bots.map((b) => b.name).join(", ")}. Pick a bot below to chat!`
+                  : bot?.job
                   ? `${bot.job} — Ready to help you with your work.`
                   : "Send a message to start chatting."
               }
@@ -244,17 +318,79 @@ function ChatView({
             onSubmit={({ text }) => {
               const trimmed = text.trim()
               if (!trimmed || isGenerating) return
-              sendMessage({ text: trimmed })
+              sendMessage(
+                { text: trimmed },
+                {
+                  metadata: {
+                    botId: selectedBot?.id,
+                    botName: selectedBot?.name,
+                    botJob: selectedBot?.job,
+                    botInstructions: selectedBot?.instructions ?? "",
+                    sandboxId: selectedBot?.sandboxId ?? "",
+                  },
+                }
+              )
             }}
           >
             <PromptInputBody>
               <PromptInputTextarea
-                placeholder={`Message ${botName}...`}
+                placeholder={
+                  isGroup
+                    ? `Message ${selectedBot?.name ?? "group"}...`
+                    : `Message ${botName}...`
+                }
                 className="min-h-12 max-h-48 resize-none"
               />
             </PromptInputBody>
             <PromptInputFooter>
-              <PromptInputTools />
+              <PromptInputTools>
+                {isGroup && bots.length > 1 && (
+                  <PromptInputSelect
+                    value={selectedBotId}
+                    onValueChange={(val: any) => {
+                      if (typeof val === "string") {
+                        onSelectBot(val)
+                        const target = bots.find((b) => b.id === val)
+                        if (target && (transport as any).setClientData) {
+                          ;(transport as any).setClientData({
+                            botId: target.id,
+                            botName: target.name,
+                            botJob: target.job,
+                            botInstructions: target.instructions ?? "",
+                            sandboxId: target.sandboxId ?? "",
+                          })
+                        }
+                      }
+                    }}
+                  >
+                    <PromptInputSelectTrigger className="h-7 gap-1.5 px-2 text-xs font-medium max-w-[170px] border border-border/60 bg-muted/40 hover:bg-muted/70 transition-colors">
+                      <ChatAvatar
+                        seed={selectedBot?.avatar || selectedBot?.name || ""}
+                        className="size-3.5 rounded-xs shrink-0"
+                      />
+                      <span className="truncate">{selectedBot?.name ?? "Pick bot"}</span>
+                    </PromptInputSelectTrigger>
+                    <PromptInputSelectContent>
+                      {bots.map((b) => (
+                        <PromptInputSelectItem key={b.id} value={b.id}>
+                          <div className="flex items-center gap-2">
+                            <ChatAvatar
+                              seed={b.avatar || b.name}
+                              className="size-4 rounded-xs shrink-0"
+                            />
+                            <span className="font-medium text-xs text-foreground">
+                              {b.name}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground truncate max-w-[100px]">
+                              ({b.job})
+                            </span>
+                          </div>
+                        </PromptInputSelectItem>
+                      ))}
+                    </PromptInputSelectContent>
+                  </PromptInputSelect>
+                )}
+              </PromptInputTools>
               <PromptInputSubmit status={status} onStop={stop} />
             </PromptInputFooter>
           </PromptInput>
