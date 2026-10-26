@@ -1,2 +1,8 @@
-export { ChatInterface as Chat, ChatInterface } from "./chat-interface"
+export {
+  ChatInterface as Chat,
+  ChatInterface,
+  ToolPartView,
+  getToolName,
+  getToolDisplayInfo,
+} from "./chat-interface"
 export type { ChatProps } from "./chat-interface"

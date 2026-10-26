@@ -7,6 +7,9 @@ import {
   type ChatStartSessionParams,
 } from "@trigger.dev/sdk/ai"
 import { auth } from "@clerk/nextjs/server"
+import { and, eq } from "drizzle-orm"
+import { db } from "@/db"
+import { chats } from "@/db/schema"
 import type { chatAgent } from "@/src/trigger/chat"
 
 const start = chat.createStartSessionAction<typeof chatAgent>("chat-agent")
@@ -19,7 +22,29 @@ export async function startChatSession(
     throw new Error("Unauthorized")
   }
 
-  return start(params)
+  const chatRecord = await db.query.chats.findFirst({
+    where: and(eq(chats.id, params.chatId), eq(chats.userId, userId)),
+    with: {
+      members: {
+        with: {
+          bot: true,
+        },
+      },
+    },
+  })
+
+  const bot = chatRecord?.members?.[0]?.bot
+
+  return start({
+    ...params,
+    clientData: {
+      botName: bot?.name ?? params.clientData?.botName ?? "AI Teammate",
+      botJob: bot?.job ?? params.clientData?.botJob ?? "AI Assistant",
+      botInstructions:
+        bot?.instructions ?? params.clientData?.botInstructions ?? "",
+      sandboxId: bot?.sandboxId ?? params.clientData?.sandboxId ?? "",
+    },
+  })
 }
 
 export async function mintChatAccessToken(chatId: string) {
