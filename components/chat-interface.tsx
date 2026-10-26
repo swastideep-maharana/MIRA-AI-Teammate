@@ -2,6 +2,17 @@
 
 import * as React from "react"
 import { useChat } from "@ai-sdk/react"
+import type { UIMessage } from "ai"
+import {
+  useTriggerChatTransport,
+  useLoadTranscript,
+} from "@trigger.dev/sdk/chat/react"
+import type { chatAgent } from "@/src/trigger/chat"
+import {
+  mintChatAccessToken,
+  startChatSession,
+  loadChatTranscript,
+} from "@/app/actions/chat"
 
 import {
   Conversation,
@@ -23,8 +34,9 @@ import {
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input"
 import { ChatAvatar } from "@/components/chat-avatar"
+import { Spinner } from "@/components/ui/spinner"
 
-interface ChatInterfaceProps {
+export interface ChatProps {
   chatId: string
   bot?: {
     name?: string | null
@@ -34,9 +46,54 @@ interface ChatInterfaceProps {
   } | null
 }
 
-export function ChatInterface({ chatId, bot }: ChatInterfaceProps) {
+export function ChatInterface({ chatId, bot }: ChatProps) {
+  const transport = useTriggerChatTransport<typeof chatAgent>({
+    task: "chat-agent",
+    accessToken: ({ chatId }) => mintChatAccessToken(chatId),
+    startSession: ({ chatId, clientData }) =>
+      startChatSession({ chatId, clientData }),
+  })
+
+  const { messages: initialMessages, isLoading } = useLoadTranscript(
+    chatId,
+    loadChatTranscript,
+    { transport }
+  )
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center h-full">
+        <Spinner className="size-6 text-muted-foreground" />
+      </div>
+    )
+  }
+
+  return (
+    <ChatView
+      chatId={chatId}
+      bot={bot}
+      transport={transport}
+      initialMessages={initialMessages}
+    />
+  )
+}
+
+function ChatView({
+  chatId,
+  bot,
+  transport,
+  initialMessages,
+}: {
+  chatId: string
+  bot?: ChatProps["bot"]
+  transport: ReturnType<typeof useTriggerChatTransport>
+  initialMessages: UIMessage[]
+}) {
   const { messages, sendMessage, status, stop, error } = useChat({
     id: chatId,
+    messages: initialMessages,
+    transport,
+    resume: initialMessages.length > 0,
   })
 
   const botName = bot?.name || "AI Teammate"
@@ -78,7 +135,9 @@ export function ChatInterface({ chatId, bot }: ChatInterfaceProps) {
                 )}
                 <Message
                   from={message.role}
-                  className={message.role === "user" ? "max-w-[80%]" : "max-w-[90%]"}
+                  className={
+                    message.role === "user" ? "max-w-[80%]" : "max-w-[90%]"
+                  }
                 >
                   <MessageContent>
                     {message.parts.map((part, index) => {
@@ -111,7 +170,8 @@ export function ChatInterface({ chatId, bot }: ChatInterfaceProps) {
 
           {error && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {error.message || "An error occurred while generating the response. Please try again."}
+              {error.message ||
+                "An error occurred while generating the response. Please try again."}
             </div>
           )}
         </ConversationContent>
@@ -125,10 +185,7 @@ export function ChatInterface({ chatId, bot }: ChatInterfaceProps) {
             onSubmit={({ text }) => {
               const trimmed = text.trim()
               if (!trimmed || isGenerating) return
-              sendMessage(
-                { text: trimmed },
-                bot?.instructions ? { body: { system: bot.instructions } } : undefined
-              )
+              sendMessage({ text: trimmed })
             }}
           >
             <PromptInputBody>
