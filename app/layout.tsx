@@ -32,7 +32,7 @@ export default function RootLayout({
         geist.variable
       )}
     >
-      <body>
+      <body suppressHydrationWarning>
         <ClerkProvider
           ui={ui}
           appearance={{

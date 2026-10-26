@@ -48,6 +48,46 @@ function formatChatTime(date: Date | string) {
   }
 }
 
+function SidebarUserButton() {
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div className="flex w-full h-full items-center gap-2 p-2">
+        <div className="size-6 rounded-md bg-muted animate-pulse shrink-0" />
+        <div className="h-4 w-24 rounded bg-muted animate-pulse group-data-[collapsible=icon]:hidden" />
+      </div>
+    )
+  }
+
+  return (
+    <UserButton
+      showName
+      appearance={{
+        elements: {
+          rootBox: "!flex !w-full !h-full",
+          userButtonTrigger:
+            "!flex !w-full !h-full !items-center !gap-2 !rounded-md !p-2 !text-left !text-sm !text-inherit !bg-transparent hover:!bg-sidebar-accent hover:!text-sidebar-accent-foreground active:!bg-sidebar-accent active:!text-sidebar-accent-foreground !cursor-pointer ring-sidebar-ring outline-hidden transition-colors group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!justify-center",
+          userButtonBox:
+            "!flex !w-full !h-full !items-center !gap-2 !flex-row group-data-[collapsible=icon]:!justify-center",
+          userButtonOuterIdentifier:
+            "truncate !text-sm !font-medium text-sidebar-foreground group-hover/menu-button:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden !text-left !flex-1",
+          avatarBox:
+            "!size-[1.5rem] !w-[1.5rem] !h-[1.5rem] !shrink-0 !rounded-md",
+          userButtonAvatarBox:
+            "!size-[1.5rem] !w-[1.5rem] !h-[1.5rem] !shrink-0 !rounded-md",
+          userButtonAvatarImage:
+            "!size-[1.5rem] !w-[1.5rem] !h-[1.5rem] !rounded-md",
+        },
+      }}
+    />
+  )
+}
+
 export interface AppSidebarProps
   extends React.ComponentProps<typeof Sidebar> {
   chats?: UserChatWithBot[]
@@ -178,26 +218,7 @@ export function AppSidebar({ chats = [], ...props }: AppSidebarProps) {
                 render={<div />}
                 className="h-12 w-full p-0 cursor-pointer group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!"
               >
-                <UserButton
-                  showName
-                  appearance={{
-                    elements: {
-                      rootBox: "!flex !w-full !h-full",
-                      userButtonTrigger:
-                        "!flex !w-full !h-full !items-center !gap-2 !rounded-md !p-2 !text-left !text-sm !text-inherit !bg-transparent hover:!bg-sidebar-accent hover:!text-sidebar-accent-foreground active:!bg-sidebar-accent active:!text-sidebar-accent-foreground !cursor-pointer ring-sidebar-ring outline-hidden transition-colors group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!justify-center",
-                      userButtonBox:
-                        "!flex !w-full !h-full !items-center !gap-2 !flex-row group-data-[collapsible=icon]:!justify-center",
-                      userButtonOuterIdentifier:
-                        "truncate !text-sm !font-medium text-sidebar-foreground group-hover/menu-button:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden !text-left !flex-1",
-                      avatarBox:
-                        "!size-[1.5rem] !w-[1.5rem] !h-[1.5rem] !shrink-0 !rounded-md",
-                      userButtonAvatarBox:
-                        "!size-[1.5rem] !w-[1.5rem] !h-[1.5rem] !shrink-0 !rounded-md",
-                      userButtonAvatarImage:
-                        "!size-[1.5rem] !w-[1.5rem] !h-[1.5rem] !rounded-md",
-                    },
-                  }}
-                />
+                <SidebarUserButton />
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

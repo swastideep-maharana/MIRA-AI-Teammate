@@ -16,9 +16,14 @@ export default async function DashboardLayout({
   const chats = await getUserChats()
 
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
+    <SidebarProvider
+      defaultOpen={defaultOpen}
+      className="h-svh max-h-svh overflow-hidden"
+    >
       <AppSidebar chats={chats} />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset className="h-full max-h-svh overflow-hidden flex flex-col min-h-0">
+        {children}
+      </SidebarInset>
     </SidebarProvider>
   )
 }

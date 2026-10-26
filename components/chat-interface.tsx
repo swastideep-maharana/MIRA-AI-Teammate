@@ -143,7 +143,7 @@ function ChatView({
 
   return (
     <div className="relative flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-background">
-      <Conversation className="flex-1 overflow-y-auto">
+      <Conversation className="flex-1 min-h-0 overflow-y-auto">
         <ConversationContent className="mx-auto w-full max-w-3xl py-6 px-4 space-y-6">
           {messages.length === 0 ? (
             <ConversationEmptyState
@@ -238,7 +238,7 @@ function ChatView({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="border-t bg-background/95 backdrop-blur-sm p-4">
+      <div className="border-t bg-background/95 backdrop-blur-sm p-4 shrink-0">
         <div className="mx-auto max-w-3xl">
           <PromptInput
             onSubmit={({ text }) => {
