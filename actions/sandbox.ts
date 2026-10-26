@@ -5,6 +5,7 @@ import { daytona } from "@/lib/daytona"
 
 export interface SandboxVncUrlResult {
   url?: string
+  acceptUrl?: string
   error?: string
 }
 
@@ -40,9 +41,16 @@ export async function getSandboxVncUrl(sandboxId: string): Promise<SandboxVncUrl
     const signed = await sandbox.getSignedPreviewUrl(6080, 7200)
 
     // Append auto-connect and scale parameters so noVNC immediately connects and fits
-    const fullUrl = `${signed.url}/vnc.html?autoconnect=true&resize=scale&reconnect=true`
+    const baseUrl = signed.url.replace(/\/+$/, "")
+    const targetUrl = `${baseUrl}/vnc.html?autoconnect=true&resize=scale&reconnect=true`
 
-    return { url: fullUrl }
+    // Daytona warning bypass endpoint: submitting a POST sets the accepted cookie and redirects
+    const acceptUrl = `${baseUrl}/accept-daytona-preview-warning?redirect=${encodeURIComponent(targetUrl)}`
+
+    return {
+      url: targetUrl,
+      acceptUrl,
+    }
   } catch (error: any) {
     console.error(`Failed to get sandbox VNC URL for ${sandboxId}:`, error)
     return { error: error?.message || "Failed to get sandbox VNC URL" }

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
-import { RotateCw, Maximize2, Minimize2, X, AlertCircle, Loader2 } from "lucide-react"
+import { RotateCw, Maximize2, Minimize2, ExternalLink, X, AlertCircle, Loader2 } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,12 +22,14 @@ export function SandboxVncPreview({
   botName,
 }: SandboxVncPreviewProps) {
   const [vncUrl, setVncUrl] = useState<string | null>(null)
+  const [acceptUrl, setAcceptUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const [iframeKey, setIframeKey] = useState<number>(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const fetchVncUrl = useCallback(
     async (refresh = false) => {
@@ -50,6 +52,7 @@ export function SandboxVncPreview({
           setError(result.error)
         } else if (result.url) {
           setVncUrl(result.url)
+          setAcceptUrl(result.acceptUrl || null)
           if (refresh) {
             setIframeKey((prev) => prev + 1)
           }
@@ -67,6 +70,17 @@ export function SandboxVncPreview({
   useEffect(() => {
     fetchVncUrl()
   }, [fetchVncUrl])
+
+  // Automatically submit bypass form when acceptUrl is ready so Daytona preview warning is skipped
+  useEffect(() => {
+    if (acceptUrl && formRef.current) {
+      try {
+        formRef.current.submit()
+      } catch (e) {
+        console.warn("Failed to auto-submit bypass form:", e)
+      }
+    }
+  }, [acceptUrl, iframeKey])
 
   // Prevent dialog from being closed by any hotkeys or outside clicks
   const handleOpenChange = useCallback((open: boolean, eventDetails?: any) => {
@@ -86,8 +100,20 @@ export function SandboxVncPreview({
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 overflow-hidden bg-background select-none">
-      {/* Top action bar with Refresh icon button */}
-      <div className="flex items-center justify-end px-4 pt-3 pb-1 shrink-0">
+      {/* Top action bar with Refresh and external link buttons */}
+      <div className="flex items-center justify-end gap-1 px-4 pt-3 pb-1 shrink-0">
+        {vncUrl && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => window.open(vncUrl, "_blank", "noopener,noreferrer")}
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            title="Open VNC in new tab"
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span className="sr-only">Open in new tab</span>
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -185,15 +211,46 @@ export function SandboxVncPreview({
 
                 {/* VNC Screen Content */}
                 <div className="flex-1 w-full h-full min-h-0 bg-black relative">
+                  {acceptUrl && (
+                    <form
+                      ref={formRef}
+                      action={acceptUrl}
+                      method="POST"
+                      target="daytona-vnc-frame"
+                      className="hidden"
+                    >
+                      <input type="hidden" name="accept" value="true" />
+                    </form>
+                  )}
                   <iframe
+                    name="daytona-vnc-frame"
                     key={iframeKey}
-                    src={vncUrl}
+                    src={acceptUrl ? undefined : (vncUrl || undefined)}
                     title={screenTitle}
                     className="w-full h-full border-0 bg-black"
                     allow="clipboard-read; clipboard-write; fullscreen"
                   />
                 </div>
               </div>
+
+              {/* Top-right maximize button for preview mode */}
+              {!isFullscreen && (
+                <div className="absolute top-2 right-2 z-20 pointer-events-auto">
+                  <Button
+                    variant="secondary"
+                    size="icon-xs"
+                    className="h-7 w-7 rounded-md bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/60 backdrop-blur-md cursor-pointer transition-transform hover:scale-105 shadow-md"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsFullscreen(true)
+                    }}
+                    title="Open in fullscreen"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span className="sr-only">Open in fullscreen</span>
+                  </Button>
+                </div>
+              )}
 
               {/* Click overlay for preview mode: clicking opens fullscreen */}
               {!isFullscreen && (
