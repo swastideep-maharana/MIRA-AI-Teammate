@@ -82,18 +82,19 @@ export function SandboxVncPreview({
     }
   }, [acceptUrl, iframeKey])
 
-  // Prevent dialog from being closed by any hotkeys or outside clicks
-  const handleOpenChange = useCallback((open: boolean, eventDetails?: any) => {
-    if (!open) {
-      if (
-        eventDetails?.reason === "close-press" ||
-        eventDetails?.reason === "imperative-action"
-      ) {
-        setIsFullscreen(false)
-      }
-      return
+  // Ensure that whenever isFullscreen is false, no stuck blurry dialog backdrops remain in the DOM
+  useEffect(() => {
+    if (!isFullscreen) {
+      const strayOverlays = document.querySelectorAll('[data-slot="dialog-overlay"]')
+      strayOverlays.forEach((el) => el.remove())
     }
-    setIsFullscreen(open)
+  }, [isFullscreen])
+
+  // Prevent dialog from being closed by outside clicks; allow explicit minimize/close
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setIsFullscreen(false)
+    }
   }, [])
 
   const screenTitle = botName ? `${botName}'s screen` : "Sandbox screen"
@@ -283,15 +284,17 @@ export function SandboxVncPreview({
       </div>
 
       {/* Fullscreen Dialog Overlay using @components/ui/dialog.tsx */}
-      <Dialog
-        open={isFullscreen}
-        onOpenChange={handleOpenChange}
-        disablePointerDismissal={true}
-      >
-        <DialogPortal>
-          <DialogOverlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" />
-        </DialogPortal>
-      </Dialog>
+      {isFullscreen && (
+        <Dialog
+          open={isFullscreen}
+          onOpenChange={handleOpenChange}
+          disablePointerDismissal={true}
+        >
+          <DialogPortal>
+            <DialogOverlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" />
+          </DialogPortal>
+        </Dialog>
+      )}
     </div>
   )
 }
