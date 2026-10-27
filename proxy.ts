@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
+import { NextResponse } from "next/server"
 
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
@@ -7,7 +8,20 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
-    await auth.protect()
+    const { userId } = await auth()
+    if (!userId) {
+      // If this is a Server Action or RSC refresh triggered during/after sign-out, return 200 instead of crashing
+      if (
+        request.headers.has("next-action") ||
+        request.headers.get("accept")?.includes("text/x-component")
+      ) {
+        return new NextResponse(null, { status: 200 })
+      }
+
+      const signInUrl = new URL("/sign-in", request.url)
+      signInUrl.searchParams.set("redirect_url", request.url)
+      return NextResponse.redirect(signInUrl)
+    }
   }
 })
 

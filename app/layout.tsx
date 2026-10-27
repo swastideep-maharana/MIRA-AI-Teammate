@@ -52,7 +52,18 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `window.next = window.next || {}; window.next.version = "16.4.3";`,
+            __html: `
+              window.next = window.next || {};
+              window.next.version = "16.4.3";
+              try {
+                Object.defineProperty(window, '__internal_onBeforeSetActive', {
+                  configurable: true,
+                  enumerable: true,
+                  get: function() { return function() { return Promise.resolve(); }; },
+                  set: function() {}
+                });
+              } catch (e) {}
+            `,
           }}
         />
       </head>
