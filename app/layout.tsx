@@ -50,24 +50,6 @@ export default function RootLayout({
         geist.variable
       )}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.next = window.next || {};
-              window.next.version = "16.4.3";
-              try {
-                Object.defineProperty(window, '__internal_onBeforeSetActive', {
-                  configurable: false,
-                  enumerable: true,
-                  get: function() { return function() { return Promise.resolve(); }; },
-                  set: function() {}
-                });
-              } catch (e) {}
-            `,
-          }}
-        />
-      </head>
       <body suppressHydrationWarning>
         <ClerkProvider
           ui={ui}
