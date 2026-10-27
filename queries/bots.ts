@@ -4,36 +4,46 @@ import { db } from "@/db"
 import { bots, chats } from "@/db/schema"
 
 export async function getUserChats() {
-  const { userId } = await auth()
+  try {
+    const { userId } = await auth()
 
-  if (!userId) {
-    return []
-  }
+    if (!userId) {
+      return []
+    }
 
-  return db.query.chats.findMany({
-    where: eq(chats.userId, userId),
-    orderBy: [desc(chats.lastMessageAt)],
-    with: {
-      members: {
-        with: {
-          bot: true,
+    return await db.query.chats.findMany({
+      where: eq(chats.userId, userId),
+      orderBy: [desc(chats.lastMessageAt)],
+      with: {
+        members: {
+          with: {
+            bot: true,
+          },
         },
       },
-    },
-  })
+    })
+  } catch (error) {
+    console.error("Failed to fetch user chats:", error)
+    return []
+  }
 }
 
 export async function getUserBots() {
-  const { userId } = await auth()
+  try {
+    const { userId } = await auth()
 
-  if (!userId) {
+    if (!userId) {
+      return []
+    }
+
+    return await db.query.bots.findMany({
+      where: eq(bots.userId, userId),
+      orderBy: [desc(bots.createdAt)],
+    })
+  } catch (error) {
+    console.error("Failed to fetch user bots:", error)
     return []
   }
-
-  return db.query.bots.findMany({
-    where: eq(bots.userId, userId),
-    orderBy: [desc(bots.createdAt)],
-  })
 }
 
 export type UserChatWithBot = Awaited<ReturnType<typeof getUserChats>>[number]
