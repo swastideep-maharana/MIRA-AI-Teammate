@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server"
+import { redirect } from "next/navigation"
 import { Plus } from "lucide-react"
 import { nanoid } from "nanoid"
 
@@ -15,7 +16,10 @@ import { ChatAvatar } from "@/components/chat-avatar"
 import { BotDialog } from "@/components/bot-dialog"
 
 export default async function Page() {
-  await auth.protect()
+  const { userId } = await auth()
+  if (!userId) {
+    redirect("/sign-in")
+  }
 
   const seed = nanoid()
 

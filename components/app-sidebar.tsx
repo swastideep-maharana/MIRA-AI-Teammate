@@ -70,6 +70,7 @@ function SidebarUserButton() {
   return (
     <UserButton
       showName
+      signInUrl="/sign-in"
       appearance={{
         elements: {
           rootBox: "!flex !w-full !h-full",

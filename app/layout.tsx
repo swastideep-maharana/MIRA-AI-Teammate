@@ -49,6 +49,13 @@ export default function RootLayout({
         geist.variable
       )}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.next = window.next || {}; window.next.version = "16.4.3";`,
+          }}
+        />
+      </head>
       <body suppressHydrationWarning>
         <ClerkProvider
           ui={ui}
