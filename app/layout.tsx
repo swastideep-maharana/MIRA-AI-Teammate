@@ -8,6 +8,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/toast"
+import { ClerkFix } from "@/components/clerk-fix"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -57,7 +58,7 @@ export default function RootLayout({
               window.next.version = "16.4.3";
               try {
                 Object.defineProperty(window, '__internal_onBeforeSetActive', {
-                  configurable: true,
+                  configurable: false,
                   enumerable: true,
                   get: function() { return function() { return Promise.resolve(); }; },
                   set: function() {}
@@ -77,6 +78,7 @@ export default function RootLayout({
             },
           }}
         >
+          <ClerkFix />
           <ThemeProvider>
             <TooltipProvider>
               <Toaster>{children}</Toaster>

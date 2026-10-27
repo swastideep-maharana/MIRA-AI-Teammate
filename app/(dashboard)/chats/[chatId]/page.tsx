@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
+import { auth } from "@clerk/nextjs/server"
 import { getChat } from "@/queries/chats"
 import { ChatHeader } from "@/components/chat-header"
 import { ChatInterface } from "@/components/chat-interface"
@@ -18,6 +19,11 @@ export default async function ChatPage({
 }) {
   const { chatId } = await params
   const { desktop } = await searchParams
+
+  const { userId } = await auth()
+  if (!userId) {
+    redirect("/sign-in")
+  }
 
   const chat = await getChat(chatId)
 

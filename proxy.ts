@@ -10,8 +10,9 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     const { userId } = await auth()
     if (!userId) {
-      // If this is a Server Action or RSC refresh triggered during/after sign-out, return 200 instead of crashing
+      // If this is a Server Action, POST, or RSC refresh triggered during/after sign-out, return 200 instead of crashing
       if (
+        request.method === "POST" ||
         request.headers.has("next-action") ||
         request.headers.get("accept")?.includes("text/x-component")
       ) {
