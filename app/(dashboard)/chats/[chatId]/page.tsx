@@ -10,6 +10,8 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 
+export const maxDuration = 60
+
 export default async function ChatPage({
   params,
   searchParams,

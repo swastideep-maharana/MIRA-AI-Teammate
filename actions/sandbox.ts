@@ -10,8 +10,8 @@ export interface SandboxVncUrlResult {
 }
 
 export async function getSandboxVncUrl(sandboxId: string): Promise<SandboxVncUrlResult> {
-  const { isAuthenticated, userId } = await auth()
-  if (!isAuthenticated || !userId) {
+  const { userId } = await auth()
+  if (!userId) {
     return { error: "Unauthorized" }
   }
 
@@ -34,7 +34,11 @@ export async function getSandboxVncUrl(sandboxId: string): Promise<SandboxVncUrl
         await sandbox.computerUse.start()
       }
     } catch {
-      await sandbox.computerUse.start()
+      try {
+        await sandbox.computerUse.start()
+      } catch (cuError: any) {
+        console.warn(`Could not start computerUse for sandbox ${sandboxId}:`, cuError)
+      }
     }
 
     // Get signed preview URL for noVNC on port 6080, valid for 2 hours (7200s)

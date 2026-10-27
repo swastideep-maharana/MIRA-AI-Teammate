@@ -16,10 +16,10 @@ import {
 import { daytona } from "@/lib/daytona"
 import { DaytonaNotFoundError } from "@daytona/sdk"
 
-export async function createBot(data: BotInsert): Promise<Bot> {
-  const { isAuthenticated, userId } = await auth()
+export async function createBot(data: BotInsert): Promise<Bot & { chatId: string }> {
+  const { userId } = await auth()
 
-  if (!isAuthenticated || !userId) {
+  if (!userId) {
     throw new Error("Unauthorized")
   }
 
@@ -28,26 +28,39 @@ export async function createBot(data: BotInsert): Promise<Bot> {
   const botId = nanoid()
   const chatId = nanoid()
 
-  // Create Daytona sandbox for this bot
-  const sandbox = await daytona.create()
-  const sandboxId = sandbox.id
-
-  // Create a blank MEMORY.md file in bot's sandbox on creation
+  // Create Daytona sandbox for this bot with error handling
+  let sandbox: any = null
+  let sandboxId: string | null = null
   try {
-    if (sandbox.state && sandbox.state !== "started") {
+    sandbox = await daytona.create()
+    sandboxId = sandbox.id
+  } catch (daytonaError: any) {
+    console.error("Failed to create Daytona sandbox:", daytonaError)
+    throw new Error(
+      `Failed to provision bot environment: ${daytonaError?.message || "Daytona service unavailable"}`
+    )
+  }
+
+  // Create a blank MEMORY.md file in bot's sandbox in background without blocking response
+  if (sandbox && sandboxId) {
+    void (async () => {
       try {
-        await sandbox.start()
-      } catch {}
-    }
-    await sandbox.fs.uploadFile(
-      Buffer.from("# MEMORY\n\n", "utf-8"),
-      "MEMORY.md"
-    )
-  } catch (memError) {
-    console.warn(
-      `Failed to initialize MEMORY.md for sandbox ${sandboxId}:`,
-      memError
-    )
+        if (sandbox.state && sandbox.state !== "started") {
+          try {
+            await sandbox.start()
+          } catch {}
+        }
+        await sandbox.fs.uploadFile(
+          Buffer.from("# MEMORY\n\n", "utf-8"),
+          "MEMORY.md"
+        )
+      } catch (memError) {
+        console.warn(
+          `Failed to initialize MEMORY.md for sandbox ${sandboxId}:`,
+          memError
+        )
+      }
+    })().catch(() => {})
   }
 
   let botRows: Bot[]
@@ -85,10 +98,12 @@ export async function createBot(data: BotInsert): Promise<Bot> {
     botRows = insertedBotRows
   } catch (error) {
     // If DB insert fails, cleanup the created sandbox
-    try {
-      await daytona.delete(sandbox)
-    } catch (cleanupError) {
-      console.error(`Failed to cleanup sandbox ${sandboxId}:`, cleanupError)
+    if (sandbox) {
+      try {
+        await daytona.delete(sandbox)
+      } catch (cleanupError) {
+        console.error(`Failed to cleanup sandbox ${sandboxId}:`, cleanupError)
+      }
     }
     throw error
   }
@@ -97,13 +112,16 @@ export async function createBot(data: BotInsert): Promise<Bot> {
 
   revalidatePath("/")
 
-  return newBot
+  return {
+    ...newBot,
+    chatId,
+  }
 }
 
 export async function updateBot(id: string, data: BotInsert): Promise<Bot> {
-  const { isAuthenticated, userId } = await auth()
+  const { userId } = await auth()
 
-  if (!isAuthenticated || !userId) {
+  if (!userId) {
     throw new Error("Unauthorized")
   }
 
@@ -132,9 +150,9 @@ export async function updateBot(id: string, data: BotInsert): Promise<Bot> {
 }
 
 export async function deleteBot(id: string): Promise<void> {
-  const { isAuthenticated, userId } = await auth()
+  const { userId } = await auth()
 
-  if (!isAuthenticated || !userId) {
+  if (!userId) {
     throw new Error("Unauthorized")
   }
 

@@ -15,6 +15,8 @@ import {
 import { ChatAvatar } from "@/components/chat-avatar"
 import { BotDialog } from "@/components/bot-dialog"
 
+export const maxDuration = 60
+
 export default async function Page() {
   const { userId } = await auth()
   if (!userId) {

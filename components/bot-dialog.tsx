@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { nanoid } from "nanoid"
@@ -74,11 +75,12 @@ const PRESETS = [
 
 interface BotFormProps {
   bot?: Bot | null
-  onSuccess: (bot: Bot) => void
+  onSuccess: (bot: Bot & { chatId?: string }) => void
   onDeleted?: (bot: Bot) => void
 }
 
 function BotForm({ bot, onSuccess, onDeleted }: BotFormProps) {
+  const router = useRouter()
   const isEditing = Boolean(bot)
   const [initialSeed] = React.useState(() => bot?.avatar || nanoid())
   const [showDeleteAlert, setShowDeleteAlert] = React.useState(false)
@@ -156,6 +158,10 @@ function BotForm({ bot, onSuccess, onDeleted }: BotFormProps) {
           type: "success",
         })
         onSuccess(newBot)
+        if (newBot.chatId) {
+          router.push(`/chats/${newBot.chatId}`)
+          router.refresh()
+        }
       }
     } catch (error) {
       toast.add({
@@ -334,7 +340,7 @@ export interface BotDialogProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   trigger?: React.ReactNode
-  onCreated?: (bot: Bot) => void
+  onCreated?: (bot: Bot & { chatId?: string }) => void
   onUpdated?: (bot: Bot) => void
   onDeleted?: (bot: Bot) => void
   bot?: Bot | null
@@ -356,7 +362,7 @@ export function BotDialog({
 
   const isEditing = Boolean(bot)
 
-  const handleSuccess = (savedBot: Bot) => {
+  const handleSuccess = (savedBot: Bot & { chatId?: string }) => {
     setOpen(false)
     if (isEditing) {
       onUpdated?.(savedBot)

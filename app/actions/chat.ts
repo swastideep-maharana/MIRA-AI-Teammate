@@ -74,13 +74,18 @@ export async function mintChatAccessToken(chatId: string) {
     throw new Error("Unauthorized")
   }
 
-  return triggerAuth.createPublicToken({
-    scopes: {
-      read: { sessions: chatId },
-      write: { sessions: chatId },
-    },
-    expirationTime: "1h",
-  })
+  try {
+    return await triggerAuth.createPublicToken({
+      scopes: {
+        read: { sessions: chatId },
+        write: { sessions: chatId },
+      },
+      expirationTime: "1h",
+    })
+  } catch (error: any) {
+    console.error(`Failed to mint chat access token for chatId ${chatId}:`, error)
+    throw new Error(error?.message || "Failed to mint chat access token")
+  }
 }
 
 const load = chat.createLoadTranscriptAction(defaultStorage, { limit: 50 })
@@ -91,8 +96,13 @@ export async function loadChatTranscript(params: {
 }) {
   const { userId } = await auth()
   if (!userId) {
-    throw new Error("Unauthorized")
+    return { messages: [] }
   }
 
-  return load(params)
+  try {
+    return await load(params)
+  } catch (error: any) {
+    console.error(`Failed to load chat transcript for chatId ${params.chatId}:`, error)
+    return { messages: [] }
+  }
 }

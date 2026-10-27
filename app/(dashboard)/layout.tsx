@@ -5,6 +5,8 @@ import { getUserChats, getUserBots } from "@/queries/bots"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 
+export const maxDuration = 60
+
 export default async function DashboardLayout({
   children,
 }: {
