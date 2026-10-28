@@ -117,9 +117,10 @@ export async function POST(req: Request) {
     // 4. Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(incomingMessages, { tools })
 
-    // 5. Stream response with Google Gemini (gemini-3-flash-preview: fast & stable free tier)
+    // 5. Stream response with Google Gemini (gemini-3-flash-preview: fast & stable free tier, or AI_MODEL env)
+    const aiModelName = process.env.AI_MODEL || "gemini-3-flash-preview"
     const result = streamText({
-      model: google("gemini-3-flash-preview"),
+      model: google(aiModelName),
       system,
       messages: modelMessages,
       tools,

@@ -3,7 +3,14 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { PlusIcon, SearchIcon, UsersIcon } from "lucide-react"
+import {
+  MoreHorizontalIcon,
+  PencilIcon,
+  PlusIcon,
+  SearchIcon,
+  Trash2Icon,
+  UsersIcon,
+} from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
 import { formatDistanceToNowStrict } from "date-fns"
 
@@ -34,12 +41,27 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuAction,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Spinner } from "@/components/ui/spinner"
+import { toast } from "@/components/ui/toast"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { GroupChatAvatar } from "@/components/group-chat-avatar"
 import { BotDialog } from "@/components/bot-dialog"
 import { GroupChatDialog } from "@/components/group-chat-dialog"
+import { deleteBot } from "@/actions/bot"
+import { deleteGroupChat } from "@/actions/group-chat"
 import type { UserChatWithBot } from "@/queries/bots"
 import type { Bot } from "@/db/schema"
 
@@ -101,6 +123,15 @@ export interface AppSidebarProps
 export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps) {
   const [botDialogOpen, setBotDialogOpen] = React.useState(false)
   const [groupChatDialogOpen, setGroupChatDialogOpen] = React.useState(false)
+  const [editingBot, setEditingBot] = React.useState<Bot | null>(null)
+  const [editingGroupChat, setEditingGroupChat] = React.useState<UserChatWithBot | null>(null)
+  const [targetToDelete, setTargetToDelete] = React.useState<{
+    id: string
+    name: string
+    isGroup: boolean
+    chatId: string
+  } | null>(null)
+  const [isDeleting, setIsDeleting] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -116,6 +147,42 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
     document.addEventListener("keydown", down)
     return () => document.removeEventListener("keydown", down)
   }, [])
+
+  const handleDeleteConfirm = async () => {
+    if (!targetToDelete) return
+    setIsDeleting(true)
+    try {
+      if (targetToDelete.isGroup) {
+        await deleteGroupChat(targetToDelete.id)
+        toast.add({
+          title: "Team chat deleted",
+          description: `"${targetToDelete.name}" was deleted.`,
+          type: "success",
+        })
+      } else {
+        await deleteBot(targetToDelete.id)
+        toast.add({
+          title: "Bot deleted",
+          description: `"${targetToDelete.name}" was deleted.`,
+          type: "success",
+        })
+      }
+      const deletedChatId = targetToDelete.chatId
+      setTargetToDelete(null)
+      if (pathname === `/chats/${deletedChatId}`) {
+        router.push("/")
+      }
+      router.refresh()
+    } catch (error: any) {
+      toast.add({
+        title: targetToDelete.isGroup ? "Failed to delete team chat" : "Failed to delete bot",
+        description: error?.message || "An error occurred while deleting.",
+        type: "error",
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <>
@@ -184,7 +251,7 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
                         render={<Link href={`/chats/${chat.id}`} />}
                         isActive={isActive}
                         tooltip={name}
-                        className="h-auto items-start gap-3 p-2 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center"
+                        className="h-auto items-start gap-3 p-2 pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center"
                       >
                         {isGroup ? (
                           <GroupChatAvatar
@@ -216,6 +283,50 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
                           )}
                         </div>
                       </SidebarMenuButton>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <SidebarMenuAction
+                              showOnHover
+                              className="text-muted-foreground hover:text-foreground cursor-pointer"
+                              aria-label={`Options for ${name}`}
+                            />
+                          }
+                        >
+                          <MoreHorizontalIcon className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              if (isGroup) {
+                                setEditingGroupChat(chat)
+                              } else if (bot) {
+                                setEditingBot(bot)
+                              }
+                            }}
+                          >
+                            <PencilIcon className="size-4" />
+                            <span>{isGroup ? "Edit group" : "Edit bot"}</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => {
+                              setTargetToDelete({
+                                id: isGroup ? chat.id : (bot?.id || ""),
+                                name,
+                                isGroup,
+                                chatId: chat.id,
+                              })
+                            }}
+                          >
+                            <Trash2Icon className="size-4 text-destructive" />
+                            <span className="text-destructive">
+                              {isGroup ? "Delete team chat" : "Delete bot"}
+                            </span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </SidebarMenuItem>
                   )
                 })}
@@ -247,6 +358,71 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
         onOpenChange={setGroupChatDialogOpen}
         initialBots={bots}
       />
+
+      {/* Editing Dialogs */}
+      <BotDialog
+        open={Boolean(editingBot)}
+        onOpenChange={(open) => !open && setEditingBot(null)}
+        bot={editingBot}
+        onUpdated={() => {
+          setEditingBot(null)
+          router.refresh()
+        }}
+        onDeleted={() => {
+          const deletedBotId = editingBot?.id
+          setEditingBot(null)
+          if (deletedBotId) {
+            router.push("/")
+          }
+          router.refresh()
+        }}
+      />
+      <GroupChatDialog
+        open={Boolean(editingGroupChat)}
+        onOpenChange={(open) => !open && setEditingGroupChat(null)}
+        chat={editingGroupChat as any}
+        initialBots={bots}
+        onUpdated={() => {
+          setEditingGroupChat(null)
+          router.refresh()
+        }}
+        onDeleted={() => {
+          setEditingGroupChat(null)
+          router.push("/")
+          router.refresh()
+        }}
+      />
+
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog
+        open={Boolean(targetToDelete)}
+        onOpenChange={(open) => !open && !isDeleting && setTargetToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {targetToDelete?.isGroup ? "team chat" : "bot"} "{targetToDelete?.name}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {targetToDelete?.isGroup
+                ? "This will permanently delete this team chat and all of its conversation history. The participating bots will remain untouched."
+                : "This will permanently delete this bot, its sandbox environment, and all related chat history. This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={handleDeleteConfirm}
+            >
+              {isDeleting && <Spinner data-icon="inline-start" />}
+              {targetToDelete?.isGroup ? "Delete team chat" : "Delete bot"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CommandDialog
         open={searchOpen}

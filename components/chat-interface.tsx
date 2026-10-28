@@ -633,6 +633,13 @@ export function ToolPartView({
   onSelectBot?: (botId: string) => void
 }) {
   const toolName = getToolName(part)
+  const [isOpen, setIsOpen] = React.useState(part.state !== "output-available")
+
+  React.useEffect(() => {
+    if (part.state === "output-available") {
+      setIsOpen(false)
+    }
+  }, [part.state])
 
   // 1. viewScreen: "never rendered in chat"
   if (toolName === "viewScreen") {
@@ -770,7 +777,7 @@ export function ToolPartView({
   if (toolName === "bash") {
     const { title } = getToolDisplayInfo(toolName, part.input)
     return (
-      <Tool defaultOpen={part.state !== "output-available"} className="my-3">
+      <Tool open={isOpen} onOpenChange={setIsOpen} className="my-3">
         <ToolHeader
           title={title}
           type={part.type as any}
@@ -821,7 +828,7 @@ export function ToolPartView({
   // 4. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
   const { title } = getToolDisplayInfo(toolName, part.input)
   return (
-    <Tool defaultOpen={part.state !== "output-available"} className="my-3">
+    <Tool open={isOpen} onOpenChange={setIsOpen} className="my-3">
       <ToolHeader
         title={title}
         type={part.type as any}
