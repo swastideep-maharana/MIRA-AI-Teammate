@@ -117,14 +117,14 @@ export async function POST(req: Request) {
     // 4. Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(incomingMessages, { tools })
 
-    // 5. Stream response with modern Google Gemini (gemini-3.5-flash)
+    // 5. Stream response with Google Gemini (gemini-3-flash-preview: fast & stable free tier)
     const result = streamText({
-      model: google("gemini-3.5-flash"),
+      model: google("gemini-3-flash-preview"),
       system,
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(15),
-      maxRetries: 3,
+      maxRetries: 1,
     })
 
     return result.toUIMessageStreamResponse({

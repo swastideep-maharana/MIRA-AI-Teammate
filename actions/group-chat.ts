@@ -9,7 +9,7 @@ import { chats, chatMembers, bots } from "@/db/schema"
 import { getUserBots } from "@/queries/bots"
 import { z } from "zod"
 
-export const createGroupChatSchema = z.object({
+const createGroupChatSchema = z.object({
   name: z.string().min(1, "Group name is required").max(64, "Name is too long").trim(),
   botIds: z.array(z.string()).min(1, "Select at least one bot"),
 })
@@ -61,7 +61,7 @@ export async function getUserBotsAction() {
   return getUserBots()
 }
 
-export const updateGroupChatSchema = z.object({
+const updateGroupChatSchema = z.object({
   name: z
     .string()
     .min(1, "Group name is required")
