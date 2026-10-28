@@ -170,7 +170,7 @@ export const chatAgent = chat.agent({
     });
 
     return streamText({
-      model: google("gemini-3-flash-preview"),
+      model: google("gemini-3.8-flash"),
       system: buildSystemPrompt(clientData, memoryContent),
       messages,
       tools,

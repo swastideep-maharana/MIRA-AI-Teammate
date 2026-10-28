@@ -50,6 +50,10 @@ export default function RootLayout({
     >
       <body suppressHydrationWarning>
         <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          signInFallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/"
           appearance={{
             theme: shadcn,
             options: {

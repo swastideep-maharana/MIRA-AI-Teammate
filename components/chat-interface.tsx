@@ -430,7 +430,7 @@ function ChatView({
               {error.message?.includes("Minified React error") ||
               error.message?.includes("Server Components render") ||
               error.message?.includes("digest")
-                ? "The AI agent connection failed (HTTP 500). If running locally, ensure your Trigger.dev dev worker is running (`npx trigger.dev@latest dev`). In production, verify that your TRIGGER_SECRET_KEY is configured."
+                ? "Could not establish a connection to the chat service. Please check your network and try again."
                 : error.message ||
                   "An error occurred while generating the response. Please try again."}
             </div>

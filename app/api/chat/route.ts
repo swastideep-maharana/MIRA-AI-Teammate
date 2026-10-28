@@ -117,13 +117,14 @@ export async function POST(req: Request) {
     // 4. Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(incomingMessages, { tools })
 
-    // 5. Stream response with Google Gemini
+    // 5. Stream response with Google Gemini (gemini-3.8-flash)
     const result = streamText({
-      model: google("gemini-2.5-flash"),
+      model: google("gemini-3.8-flash"),
       system,
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(15),
+      maxRetries: 3,
     })
 
     return result.toUIMessageStreamResponse({
@@ -132,6 +133,16 @@ export async function POST(req: Request) {
         botName: resolvedClientData.botName,
         botJob: resolvedClientData.botJob,
       }),
+      onError: (err: unknown) => {
+        console.error("AI stream error in /api/chat:", err)
+        if (err instanceof Error) {
+          if (err.message.includes("high demand") || err.message.includes("503")) {
+            return "The AI model (Gemini 3.8 Flash) is temporarily experiencing high demand. Please try sending your message again."
+          }
+          return err.message
+        }
+        return "An error occurred while streaming the AI response. Please try again."
+      },
       onFinish: async ({ responseMessage }) => {
         if (responseMessage) {
           try {
