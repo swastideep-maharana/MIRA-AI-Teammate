@@ -151,7 +151,16 @@ function BotForm({ bot, onSuccess, onDeleted }: BotFormProps) {
         })
         onSuccess(updatedBot)
       } else {
-        const newBot = await createBot(data)
+        const res = await fetch("/api/bots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        })
+        const result = await res.json()
+        if (!res.ok || result.error) {
+          throw new Error(result.error || "Failed to create bot")
+        }
+        const newBot = result.bot
         toast.add({
           title: "Bot created",
           description: `${newBot.name} is ready to chat.`,

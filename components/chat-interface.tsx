@@ -309,6 +309,18 @@ function ChatView({
               const msgBotAvatar = msgBot?.avatar || msgBot?.name || botAvatar
               const msgBotName = msgBot?.name || botName
 
+              // Skip empty assistant messages (e.g. from prior network aborts)
+              if (
+                message.role === "assistant" &&
+                (!message.parts ||
+                  message.parts.length === 0 ||
+                  message.parts.every(
+                    (p) => p.type === "text" && !p.text?.trim()
+                  ))
+              ) {
+                return null
+              }
+
               return (
                 <div
                   key={message.id}

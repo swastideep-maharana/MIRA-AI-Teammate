@@ -10,7 +10,6 @@ import {
   DialogOverlay,
   DialogPortal,
 } from "@/components/ui/dialog"
-import { getSandboxVncUrl } from "@/actions/sandbox"
 
 interface SandboxVncPreviewProps {
   sandboxId?: string | null
@@ -47,9 +46,12 @@ export function SandboxVncPreview({
       setError(null)
 
       try {
-        const result = await getSandboxVncUrl(sandboxId)
-        if (result.error) {
-          setError(result.error)
+        const res = await fetch(
+          `/api/sandbox/vnc?sandboxId=${encodeURIComponent(sandboxId)}`
+        )
+        const result = await res.json()
+        if (!res.ok || result.error) {
+          setError(result.error || "Failed to connect to sandbox.")
         } else if (result.url) {
           setVncUrl(result.url)
           setAcceptUrl(result.acceptUrl || null)
@@ -59,17 +61,7 @@ export function SandboxVncPreview({
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err || "")
-        if (
-          msg.includes("Minified React error") ||
-          msg.includes("Server Components render") ||
-          msg.includes("digest")
-        ) {
-          setError(
-            "Could not connect to sandbox screen. The sandbox may be offline or still starting up. Please click Retry."
-          )
-        } else {
-          setError(msg || "Failed to connect to sandbox VNC.")
-        }
+        setError(msg || "Failed to connect to sandbox VNC.")
       } finally {
         setIsLoading(false)
         setIsRefreshing(false)

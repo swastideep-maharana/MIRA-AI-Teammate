@@ -28,17 +28,16 @@ export async function createBot(data: BotInsert): Promise<Bot & { chatId: string
   const botId = nanoid()
   const chatId = nanoid()
 
-  // Create Daytona sandbox for this bot with error handling
+  // Create Daytona sandbox for this bot with graceful error handling
   let sandbox: any = null
   let sandboxId: string | null = null
-  try {
-    sandbox = await daytona.create()
-    sandboxId = sandbox.id
-  } catch (daytonaError: any) {
-    console.error("Failed to create Daytona sandbox:", daytonaError)
-    throw new Error(
-      `Failed to provision bot environment: ${daytonaError?.message || "Daytona service unavailable"}`
-    )
+  if (process.env.DAYTONA_API_KEY) {
+    try {
+      sandbox = await daytona.create()
+      sandboxId = sandbox.id
+    } catch (daytonaError: any) {
+      console.warn("Could not create Daytona sandbox:", daytonaError)
+    }
   }
 
   // Create a blank MEMORY.md file in bot's sandbox in background without blocking response

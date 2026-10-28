@@ -117,9 +117,9 @@ export async function POST(req: Request) {
     // 4. Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(incomingMessages, { tools })
 
-    // 5. Stream response with Google Gemini (gemini-3.8-flash)
+    // 5. Stream response with modern Google Gemini (gemini-3.5-flash)
     const result = streamText({
-      model: google("gemini-3.8-flash"),
+      model: google("gemini-3.5-flash"),
       system,
       messages: modelMessages,
       tools,
@@ -136,8 +136,11 @@ export async function POST(req: Request) {
       onError: (err: unknown) => {
         console.error("AI stream error in /api/chat:", err)
         if (err instanceof Error) {
+          if (err.message.includes("quota") || err.message.includes("429") || err.message.includes("RESOURCE_EXHAUSTED")) {
+            return "API rate limit reached. Please wait a moment before sending another message."
+          }
           if (err.message.includes("high demand") || err.message.includes("503")) {
-            return "The AI model (Gemini 3.8 Flash) is temporarily experiencing high demand. Please try sending your message again."
+            return "The AI service is temporarily experiencing high demand. Please try sending your message again."
           }
           return err.message
         }
@@ -145,6 +148,18 @@ export async function POST(req: Request) {
       },
       onFinish: async ({ responseMessage }) => {
         if (responseMessage) {
+          const hasContent =
+            responseMessage.parts &&
+            responseMessage.parts.length > 0 &&
+            responseMessage.parts.some(
+              (p: any) => p.type !== "text" || Boolean(p.text?.trim())
+            )
+
+          if (!hasContent) {
+            console.warn("Skipping persistence of empty assistant response.")
+            return
+          }
+
           try {
             await db.insert(messagesTable).values({
               id: responseMessage.id || nanoid(),
