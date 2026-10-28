@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 import { auth } from "@clerk/nextjs/server"
-import { getChat } from "@/queries/chats"
+import { getChat, getChatMessages } from "@/queries/chats"
 import { ChatHeader } from "@/components/chat-header"
 import { ChatInterface } from "@/components/chat-interface"
 import { SandboxVncPreview } from "@/components/sandbox-vnc-preview"
@@ -27,7 +27,10 @@ export default async function ChatPage({
     redirect("/sign-in")
   }
 
-  const chat = await getChat(chatId)
+  const [chat, initialMessages] = await Promise.all([
+    getChat(chatId),
+    getChatMessages(chatId),
+  ])
 
   if (!chat) {
     notFound()
@@ -58,6 +61,7 @@ export default async function ChatPage({
                 bot={bot}
                 chat={chat}
                 bots={bots}
+                initialMessages={initialMessages}
               />
             </div>
           </div>

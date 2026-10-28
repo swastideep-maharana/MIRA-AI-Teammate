@@ -2,17 +2,7 @@
 
 import * as React from "react"
 import { useChat } from "@ai-sdk/react"
-import type { UIMessage } from "ai"
-import {
-  useTriggerChatTransport,
-  useLoadTranscript,
-} from "@trigger.dev/sdk/chat/react"
-import type { chatAgent } from "@/src/trigger/chat"
-import {
-  mintChatAccessToken,
-  startChatSession,
-  loadChatTranscript,
-} from "@/app/actions/chat"
+import { DefaultChatTransport, isToolUIPart, type UIMessage } from "ai"
 
 import {
   Conversation,
@@ -39,7 +29,6 @@ import {
   PromptInputSelectValue,
 } from "@/components/ai-elements/prompt-input"
 import { GroupChatAvatar } from "@/components/group-chat-avatar"
-import { isToolUIPart } from "ai"
 import {
   Tool,
   ToolHeader,
@@ -76,7 +65,6 @@ import {
   BrainIcon,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
-import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
 
 export interface ChatProps {
@@ -102,9 +90,16 @@ export interface ChatProps {
     instructions?: string | null
     sandboxId?: string | null
   }>
+  initialMessages?: UIMessage[]
 }
 
-export function ChatInterface({ chatId, bot, chat, bots = [] }: ChatProps) {
+export function ChatInterface({
+  chatId,
+  bot,
+  chat,
+  bots = [],
+  initialMessages = [],
+}: ChatProps) {
   const memberBots = React.useMemo(() => {
     if (bots && bots.length > 0) return bots
     if (bot) return [bot as any]
@@ -121,12 +116,8 @@ export function ChatInterface({ chatId, bot, chat, bots = [] }: ChatProps) {
     return memberBots.find((b) => b.id === selectedBotId) ?? memberBots[0] ?? bot
   }, [memberBots, selectedBotId, bot])
 
-  const transport = useTriggerChatTransport<typeof chatAgent>({
-    task: "chat-agent",
-    accessToken: ({ chatId }) => mintChatAccessToken(chatId),
-    startSession: ({ chatId, clientData }) =>
-      startChatSession({ chatId, clientData }),
-    clientData: {
+  const clientData = React.useMemo(
+    () => ({
       botId: selectedBot?.id ?? "",
       botName: selectedBot?.name ?? "AI Teammate",
       botJob: selectedBot?.job ?? "AI Assistant",
@@ -140,42 +131,19 @@ export function ChatInterface({ chatId, bot, chat, bots = [] }: ChatProps) {
         job: b.job,
         instructions: b.instructions ?? undefined,
       })),
-    },
-  })
-
-  React.useEffect(() => {
-    if (selectedBot && (transport as any).setClientData) {
-      ;(transport as any).setClientData({
-        botId: selectedBot.id,
-        botName: selectedBot.name,
-        botJob: selectedBot.job,
-        botInstructions: selectedBot.instructions ?? "",
-        sandboxId: selectedBot.sandboxId ?? "",
-        isGroup,
-        chatName: chat?.name ?? (isGroup ? "Group Chat" : undefined),
-        groupMembers: memberBots.map((b) => ({
-          id: b.id,
-          name: b.name,
-          job: b.job,
-          instructions: b.instructions ?? undefined,
-        })),
-      })
-    }
-  }, [selectedBotId, selectedBot, transport, isGroup, chat, memberBots])
-
-  const { messages: initialMessages, isLoading } = useLoadTranscript(
-    chatId,
-    loadChatTranscript,
-    { transport }
+    }),
+    [selectedBot, isGroup, chat, memberBots]
   )
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center h-full">
-        <Spinner className="size-6 text-muted-foreground" />
-      </div>
-    )
-  }
+  const transport = React.useMemo(() => {
+    return new DefaultChatTransport({
+      api: "/api/chat",
+      body: {
+        chatId,
+        clientData,
+      },
+    })
+  }, [chatId, clientData])
 
   return (
     <ChatView
@@ -210,14 +178,13 @@ function ChatView({
   isGroup: boolean
   selectedBotId: string
   onSelectBot: (botId: string) => void
-  transport: ReturnType<typeof useTriggerChatTransport>
+  transport: DefaultChatTransport<UIMessage>
   initialMessages: UIMessage[]
 }) {
   const { messages, sendMessage, status, stop, error } = useChat({
     id: chatId,
     messages: initialMessages,
     transport,
-    resume: initialMessages.length > 0,
   })
 
   const selectedBot = bots.find((b) => b.id === selectedBotId) ?? bot
@@ -520,16 +487,6 @@ function ChatView({
                     onValueChange={(val: any) => {
                       if (typeof val === "string") {
                         onSelectBot(val)
-                        const target = bots.find((b) => b.id === val)
-                        if (target && (transport as any).setClientData) {
-                          ;(transport as any).setClientData({
-                            botId: target.id,
-                            botName: target.name,
-                            botJob: target.job,
-                            botInstructions: target.instructions ?? "",
-                            sandboxId: target.sandboxId ?? "",
-                          })
-                        }
                       }
                     }}
                   >

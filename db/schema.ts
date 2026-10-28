@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   index,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -65,12 +66,37 @@ export const chatMembers = pgTable(
   ],
 );
 
+export const messages = pgTable(
+  "messages",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chats.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    parts: jsonb("parts").notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("messages_chat_id_idx").on(table.chatId)],
+);
+
 export const botsRelations = relations(bots, ({ many }) => ({
   memberships: many(chatMembers),
 }));
 
 export const chatsRelations = relations(chats, ({ many }) => ({
   members: many(chatMembers),
+  messages: many(messages),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  chat: one(chats, {
+    fields: [messages.chatId],
+    references: [chats.id],
+  }),
 }));
 
 export const chatMembersRelations = relations(chatMembers, ({ one }) => ({
@@ -103,3 +129,4 @@ export type BotInsert = z.infer<typeof botInsertSchema>;
 export type Bot = typeof bots.$inferSelect;
 export type Chat = typeof chats.$inferSelect;
 export type ChatMember = typeof chatMembers.$inferSelect;
+export type DBMessage = typeof messages.$inferSelect;
