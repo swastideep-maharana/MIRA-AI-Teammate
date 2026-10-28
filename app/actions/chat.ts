@@ -17,64 +17,73 @@ const start = chat.createStartSessionAction<typeof chatAgent>("chat-agent")
 export async function startChatSession(
   params: ChatStartSessionParams<typeof chatAgent>
 ) {
-  const { userId } = await auth()
-  if (!userId) {
-    throw new Error("Unauthorized")
-  }
+  try {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error("Unauthorized. Please refresh or sign in again.")
+    }
 
-  const chatRecord = await db.query.chats.findFirst({
-    where: and(eq(chats.id, params.chatId), eq(chats.userId, userId)),
-    with: {
-      members: {
-        with: {
-          bot: true,
+    const chatRecord = await db.query.chats.findFirst({
+      where: and(eq(chats.id, params.chatId), eq(chats.userId, userId)),
+      with: {
+        members: {
+          with: {
+            bot: true,
+          },
         },
       },
-    },
-  })
+    })
 
-  // If a specific botId was requested in clientData, find it among members; otherwise fallback to first member
-  const requestedBot = params.clientData?.botId
-    ? chatRecord?.members?.find((m) => m.botId === params.clientData?.botId)?.bot
-    : undefined
-  const bot = requestedBot ?? chatRecord?.members?.[0]?.bot
+    // If a specific botId was requested in clientData, find it among members; otherwise fallback to first member
+    const requestedBot = params.clientData?.botId
+      ? chatRecord?.members?.find((m) => m.botId === params.clientData?.botId)?.bot
+      : undefined
+    const bot = requestedBot ?? chatRecord?.members?.[0]?.bot
 
-  const isGroup =
-    chatRecord?.kind === "group" || (chatRecord?.members?.length ?? 0) > 1
+    const isGroup =
+      chatRecord?.kind === "group" || (chatRecord?.members?.length ?? 0) > 1
 
-  const groupMembers = (chatRecord?.members ?? [])
-    .map((m) => m.bot)
-    .filter(Boolean)
-    .map((b) => ({
-      id: b.id,
-      name: b.name,
-      job: b.job,
-      instructions: b.instructions,
-    }))
+    const groupMembers = (chatRecord?.members ?? [])
+      .map((m) => m.bot)
+      .filter(Boolean)
+      .map((b) => ({
+        id: b.id,
+        name: b.name,
+        job: b.job,
+        instructions: b.instructions,
+      }))
 
-  return start({
-    ...params,
-    clientData: {
-      botId: bot?.id ?? params.clientData?.botId ?? "",
-      botName: bot?.name ?? params.clientData?.botName ?? "AI Teammate",
-      botJob: bot?.job ?? params.clientData?.botJob ?? "AI Assistant",
-      botInstructions:
-        bot?.instructions ?? params.clientData?.botInstructions ?? "",
-      sandboxId: bot?.sandboxId ?? params.clientData?.sandboxId ?? "",
-      isGroup,
-      chatName: chatRecord?.name ?? params.clientData?.chatName ?? "Group Chat",
-      groupMembers,
-    },
-  })
+    return await start({
+      ...params,
+      clientData: {
+        botId: bot?.id ?? params.clientData?.botId ?? "",
+        botName: bot?.name ?? params.clientData?.botName ?? "AI Teammate",
+        botJob: bot?.job ?? params.clientData?.botJob ?? "AI Assistant",
+        botInstructions:
+          bot?.instructions ?? params.clientData?.botInstructions ?? "",
+        sandboxId: bot?.sandboxId ?? params.clientData?.sandboxId ?? "",
+        isGroup,
+        chatName: chatRecord?.name ?? params.clientData?.chatName ?? "Group Chat",
+        groupMembers,
+      },
+    })
+  } catch (error: unknown) {
+    console.error(`Failed to start chat session for chatId ${params?.chatId}:`, error)
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to start chat session. Ensure your Trigger.dev dev worker is running or environment keys are set."
+    throw new Error(message)
+  }
 }
 
 export async function mintChatAccessToken(chatId: string) {
-  const { userId } = await auth()
-  if (!userId) {
-    throw new Error("Unauthorized")
-  }
-
   try {
+    const { userId } = await auth()
+    if (!userId) {
+      throw new Error("Unauthorized. Please refresh or sign in again.")
+    }
+
     return await triggerAuth.createPublicToken({
       scopes: {
         read: { sessions: chatId },
@@ -82,9 +91,10 @@ export async function mintChatAccessToken(chatId: string) {
       },
       expirationTime: "1h",
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Failed to mint chat access token for chatId ${chatId}:`, error)
-    throw new Error(error?.message || "Failed to mint chat access token")
+    const message = error instanceof Error ? error.message : "Failed to mint chat access token"
+    throw new Error(message)
   }
 }
 
@@ -101,7 +111,7 @@ export async function loadChatTranscript(params: {
 
   try {
     return await load(params)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Failed to load chat transcript for chatId ${params.chatId}:`, error)
     return { messages: [] }
   }

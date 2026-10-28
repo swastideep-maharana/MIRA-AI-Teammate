@@ -57,8 +57,19 @@ export function SandboxVncPreview({
             setIframeKey((prev) => prev + 1)
           }
         }
-      } catch (err: any) {
-        setError(err?.message || "Failed to connect to sandbox VNC.")
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err || "")
+        if (
+          msg.includes("Minified React error") ||
+          msg.includes("Server Components render") ||
+          msg.includes("digest")
+        ) {
+          setError(
+            "Could not connect to sandbox screen. The sandbox may be offline or still starting up. Please click Retry."
+          )
+        } else {
+          setError(msg || "Failed to connect to sandbox VNC.")
+        }
       } finally {
         setIsLoading(false)
         setIsRefreshing(false)

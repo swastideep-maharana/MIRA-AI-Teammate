@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { ClerkProvider } from "@clerk/nextjs"
-import { ui } from "@clerk/ui"
 import { shadcn } from "@clerk/ui/themes"
 import { Geist, Geist_Mono } from "next/font/google"
 
@@ -8,7 +7,6 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/toast"
-import { ClerkFix } from "@/components/clerk-fix"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -52,7 +50,6 @@ export default function RootLayout({
     >
       <body suppressHydrationWarning>
         <ClerkProvider
-          ui={ui}
           appearance={{
             theme: shadcn,
             options: {
@@ -60,7 +57,6 @@ export default function RootLayout({
             },
           }}
         >
-          <ClerkFix />
           <ThemeProvider>
             <TooltipProvider>
               <Toaster>{children}</Toaster>
