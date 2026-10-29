@@ -43,15 +43,16 @@ export default async function ChatPage({
   const bots = chat.members?.map((m) => m.bot) ?? []
 
   return (
-    <div className="flex flex-1 h-full min-h-0 overflow-hidden">
+    <div className="flex flex-1 h-full min-h-0 overflow-hidden bg-background text-foreground transition-colors">
       <ResizablePanelGroup
         orientation="horizontal"
         className="h-full w-full min-h-0 overflow-hidden"
       >
         <ResizablePanel
-          defaultSize={isDesktopOpen ? "60%" : "100%"}
-          minSize="30%"
-          className="h-full min-h-0 overflow-hidden"
+          defaultSize={isDesktopOpen ? 55 : 100}
+          minSize={35}
+          maxSize={isDesktopOpen ? 65 : 100}
+          className="h-full min-h-0 overflow-hidden flex flex-col"
         >
           <div className="flex flex-1 flex-col h-full min-h-0 overflow-hidden">
             <ChatHeader chat={chat} isDesktopOpen={isDesktopOpen} />
@@ -68,13 +69,20 @@ export default async function ChatPage({
         </ResizablePanel>
         {isDesktopOpen && (
           <>
-            <ResizableHandle withHandle />
+            <ResizableHandle
+              withHandle
+              className="hidden md:flex bg-border/40 hover:bg-cyan-500/50 transition-colors"
+            />
             <ResizablePanel
-              defaultSize="40%"
-              minSize="20%"
-              className="bg-background h-full min-h-0 overflow-hidden"
+              defaultSize={45}
+              minSize={35}
+              maxSize={65}
+              className="hidden md:block bg-background h-full min-h-0 overflow-hidden"
             >
-              <SandboxVncPreview sandboxId={bot?.sandboxId} botName={bot?.name} />
+              <SandboxVncPreview
+                sandboxId={bot?.sandboxId}
+                botName={bot?.name}
+              />
             </ResizablePanel>
           </>
         )}

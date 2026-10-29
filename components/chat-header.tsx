@@ -9,6 +9,16 @@ import { ChatAvatar } from "@/components/chat-avatar"
 import { GroupChatAvatar } from "@/components/group-chat-avatar"
 import { BotDialog } from "@/components/bot-dialog"
 import { GroupChatDialog } from "@/components/group-chat-dialog"
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { useIsMobile } from "@/hooks/use-mobile"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import { SandboxVncPreview } from "@/components/sandbox-vnc-preview"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,10 +56,13 @@ export function ChatHeader({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const isMobile = useIsMobile()
+  const { open } = useSidebar()
 
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
   const [showDeleteAlert, setShowDeleteAlert] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
+  const [mobileDesktopOpen, setMobileDesktopOpen] = React.useState(false)
 
   const isGroup = chat.kind === "group" || (chat.members?.length ?? 0) > 1
   const bot = chat.members?.[0]?.bot
@@ -61,6 +74,11 @@ export function ChatHeader({
 
   const handleToggle = () => {
     if (isGroup) return
+
+    if (isMobile) {
+      setMobileDesktopOpen((prev) => !prev)
+      return
+    }
 
     if (onToggleDesktop) {
       onToggleDesktop()
@@ -111,53 +129,79 @@ export function ChatHeader({
 
   return (
     <>
-      <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
-        {isGroup ? (
-          <Button
-            variant="ghost"
-            onClick={() => setEditDialogOpen(true)}
-            className="h-auto -ml-2 gap-2 px-2 py-1 text-sm font-medium text-foreground hover:bg-muted/50 cursor-pointer"
-          >
-            <GroupChatAvatar
-              bots={chat.members?.map((m) => m.bot)}
-              className="size-5 rounded-sm shrink-0"
-            />
-            <span className="font-semibold">{name}</span>
-            <span className="text-xs text-muted-foreground font-normal">
-              ({chat.members?.length ?? 0})
-            </span>
-          </Button>
-        ) : bot ? (
-          <Button
-            variant="ghost"
-            onClick={() => setEditDialogOpen(true)}
-            className="h-auto -ml-2 gap-2 px-2 py-1 text-sm font-medium text-foreground hover:bg-muted/50 cursor-pointer"
-          >
-            <ChatAvatar seed={avatarSeed} className="size-5 rounded-sm" />
-            <span>{name}</span>
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <ChatAvatar seed={avatarSeed} className="size-5 rounded-sm" />
-            <span className="text-sm font-medium">{name}</span>
-          </div>
-        )}
+      <header className="flex h-13 shrink-0 items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-3 sm:px-4 z-10 transition-colors">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {/* Accessible Mobile/Tablet Sidebar Drawer Trigger (only when sidebar is collapsed or on mobile) */}
+          {(isMobile || !open) && (
+            <SidebarTrigger className="-ml-1 mr-0.5 size-8 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors cursor-pointer rounded-lg" />
+          )}
 
-        <div className="flex items-center gap-1">
+          {isGroup ? (
+            <Button
+              variant="ghost"
+              onClick={() => setEditDialogOpen(true)}
+              className="h-auto gap-2 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent/60 cursor-pointer rounded-lg truncate"
+            >
+              <GroupChatAvatar
+                bots={chat.members?.map((m) => m.bot)}
+                className="size-6 rounded-md shrink-0 shadow-xs"
+              />
+              <span className="font-semibold text-foreground truncate">{name}</span>
+              <span className="text-xs text-muted-foreground font-mono">
+                ({chat.members?.length ?? 0})
+              </span>
+            </Button>
+          ) : bot ? (
+            <Button
+              variant="ghost"
+              onClick={() => setEditDialogOpen(true)}
+              className="h-auto gap-2 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent/60 cursor-pointer rounded-lg truncate"
+            >
+              <ChatAvatar seed={avatarSeed} className="size-6 rounded-md shrink-0 shadow-xs" />
+              <span className="font-semibold text-foreground truncate">{name}</span>
+              {bot.job && (
+                <span className="text-xs text-muted-foreground hidden sm:inline-block font-mono">
+                  • {bot.job}
+                </span>
+              )}
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 truncate">
+              <ChatAvatar seed={avatarSeed} className="size-6 rounded-md shrink-0 shadow-xs" />
+              <span className="text-sm font-semibold text-foreground truncate">{name}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Mobile-only Theme Toggle (on desktop, ThemeToggle is in sidebar footer) */}
+          <div className="md:hidden">
+            <ThemeToggle />
+          </div>
+
           {/* Desktop panel option is hidden for group chats */}
           {!isGroup && (
             <Button
-              variant={isDesktopOpen ? "secondary" : "ghost"}
+              variant={isDesktopOpen || mobileDesktopOpen ? "secondary" : "ghost"}
               size="icon"
               type="button"
               onClick={handleToggle}
               className={cn(
-                "size-8 text-muted-foreground hover:text-foreground transition-colors",
-                isDesktopOpen && "bg-muted text-foreground"
+                "size-8 rounded-lg text-muted-foreground hover:text-foreground transition-all cursor-pointer",
+                (isDesktopOpen || mobileDesktopOpen) &&
+                  "bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 shadow-xs"
               )}
-              aria-label="Toggle Desktop Panel"
-              aria-pressed={isDesktopOpen}
-              title={isDesktopOpen ? "Close desktop screen" : "Open desktop screen"}
+              aria-label={
+                isDesktopOpen || mobileDesktopOpen
+                  ? "Close remote desktop preview"
+                  : "Open remote desktop preview"
+              }
+              aria-pressed={isDesktopOpen || mobileDesktopOpen}
+              title={
+                isDesktopOpen || mobileDesktopOpen
+                  ? "Close remote desktop preview"
+                  : "Open remote desktop preview"
+              }
             >
               <Monitor className="size-4" />
             </Button>
@@ -172,7 +216,7 @@ export function ChatHeader({
                     variant="ghost"
                     size="icon"
                     type="button"
-                    className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors cursor-pointer"
                     aria-label="Chat options"
                     title="Chat options"
                   />
@@ -180,17 +224,21 @@ export function ChatHeader({
               >
                 <MoreVertical className="size-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
-                  <Pencil className="size-4" />
-                  <span>{isGroup ? "Edit team chat" : "Edit bot"}</span>
+              <DropdownMenuContent align="end" className="w-52 border-border bg-popover text-popover-foreground shadow-xl p-1">
+                <DropdownMenuItem
+                  onClick={() => setEditDialogOpen(true)}
+                  className="gap-2 cursor-pointer rounded-md py-2 hover:bg-accent/60"
+                >
+                  <Pencil className="size-4 text-muted-foreground" />
+                  <span>{isGroup ? "Edit team chat" : "Edit bot profile"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => setShowDeleteAlert(true)}
+                  className="gap-2 cursor-pointer rounded-md py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 focus:bg-rose-500/10"
                 >
-                  <Trash2 className="size-4 text-destructive" />
-                  <span className="text-destructive">
+                  <Trash2 className="size-4" />
+                  <span>
                     {isGroup ? "Delete team chat" : "Delete bot"}
                   </span>
                 </DropdownMenuItem>
@@ -199,6 +247,28 @@ export function ChatHeader({
           )}
         </div>
       </header>
+
+      {/* Edge-to-Edge Mobile Modal Sheet for Daytona Desktop */}
+      {isMobile && !isGroup && (
+        <Sheet open={mobileDesktopOpen} onOpenChange={setMobileDesktopOpen}>
+          <SheetContent
+            side="bottom"
+            className="h-[88svh] p-0 rounded-t-2xl border-t border-border bg-background overflow-hidden"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>{name} Daytona Remote Desktop</SheetTitle>
+            </SheetHeader>
+            <div className="h-full w-full min-h-0">
+              <SandboxVncPreview
+                sandboxId={bot?.sandboxId}
+                botName={bot?.name}
+                className="border-l-0"
+                onClose={() => setMobileDesktopOpen(false)}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Edit Dialogs */}
       {isGroup ? (
@@ -235,24 +305,30 @@ export function ChatHeader({
 
       {/* Delete Confirmation Alert Dialog */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-        <AlertDialogContent>
+        <AlertDialogContent className="border-border bg-popover text-popover-foreground shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="text-foreground">
               Delete {isGroup ? "team chat" : "bot"} "{name}"?
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-muted-foreground">
               {isGroup
                 ? "This will permanently delete this team chat and its conversation history. The participating bots will remain untouched."
                 : "This will permanently delete this bot, its sandbox environment, and all related chat history. This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={isDeleting}
+              className="border-border hover:bg-accent/60 cursor-pointer"
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               type="button"
               variant="destructive"
               disabled={isDeleting}
               onClick={handleDelete}
+              className="bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
             >
               {isDeleting && <Spinner data-icon="inline-start" />}
               {isGroup ? "Delete team chat" : "Delete bot"}

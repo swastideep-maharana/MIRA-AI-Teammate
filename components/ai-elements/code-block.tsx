@@ -309,7 +309,7 @@ export const CodeBlockContainer = ({
 }: HTMLAttributes<HTMLDivElement> & { language: string }) => (
   <div
     className={cn(
-      "group relative w-full overflow-hidden rounded-md border bg-background text-foreground",
+      "group relative w-full overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs",
       className
     )}
     data-language={language}
@@ -329,7 +329,7 @@ export const CodeBlockHeader = ({
 }: HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex items-center justify-between border-b bg-muted/80 px-3 py-2 text-muted-foreground text-xs",
+      "flex items-center justify-between border-b border-border bg-muted/60 px-3.5 py-2 text-muted-foreground text-xs select-none",
       className
     )}
     {...props}
@@ -353,7 +353,7 @@ export const CodeBlockFilename = ({
   className,
   ...props
 }: HTMLAttributes<HTMLSpanElement>) => (
-  <span className={cn("font-mono", className)} {...props}>
+  <span className={cn("font-mono text-xs text-foreground/90 font-medium", className)} {...props}>
     {children}
   </span>
 );
@@ -364,7 +364,7 @@ export const CodeBlockActions = ({
   ...props
 }: HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("-my-1 -mr-1 flex items-center gap-2", className)}
+    className={cn("-my-1 -mr-1 flex items-center gap-1.5", className)}
     {...props}
   >
     {children}
@@ -391,16 +391,6 @@ export const CodeBlockContent = ({
 
   // Async highlighting result (populated after shiki loads)
   const [asyncTokens, setAsyncTokens] = useState<TokenizedCode | null>(null);
-  const asyncKeyRef = useRef({ code, language });
-
-  // Invalidate stale async tokens synchronously during render
-  if (
-    asyncKeyRef.current.code !== code ||
-    asyncKeyRef.current.language !== language
-  ) {
-    asyncKeyRef.current = { code, language };
-    setAsyncTokens(null);
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -413,13 +403,14 @@ export const CodeBlockContent = ({
 
     return () => {
       cancelled = true;
+      setAsyncTokens(null);
     };
   }, [code, language]);
 
   const tokenized = asyncTokens ?? syncTokens;
 
   return (
-    <div className="relative overflow-auto">
+    <div className="relative overflow-auto font-mono text-xs p-3 leading-relaxed">
       <CodeBlockBody showLineNumbers={showLineNumbers} tokenized={tokenized} />
     </div>
   );
@@ -438,7 +429,16 @@ export const CodeBlock = ({
   return (
     <CodeBlockContext.Provider value={contextValue}>
       <CodeBlockContainer className={className} language={language} {...props}>
-        {children}
+        {children ?? (
+          <CodeBlockHeader>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md bg-accent px-2 py-0.5 font-mono text-[11px] font-medium text-cyan-600 dark:text-cyan-400 border border-border">
+                {language || "code"}
+              </span>
+            </div>
+            <CodeBlockCopyButton className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer" />
+          </CodeBlockHeader>
+        )}
         <CodeBlockContent
           code={code}
           language={language}
@@ -495,17 +495,26 @@ export const CodeBlockCopyButton = ({
     []
   );
 
-  const Icon = isCopied ? CheckIcon : CopyIcon;
-
   return (
     <Button
-      className={cn("shrink-0", className)}
+      className={cn(
+        "shrink-0 transition-colors h-7 px-2 text-xs font-mono",
+        isCopied ? "text-cyan-400 hover:text-cyan-300" : "text-muted-foreground hover:text-foreground",
+        className
+      )}
       onClick={copyToClipboard}
-      size="icon"
+      size="sm"
       variant="ghost"
+      aria-label={isCopied ? "Copied to clipboard" : "Copy code"}
+      title={isCopied ? "Copied!" : "Copy code"}
       {...props}
     >
-      {children ?? <Icon size={14} />}
+      {children ?? (
+        <>
+          {isCopied ? <CheckIcon className="size-3.5 text-cyan-400" /> : <CopyIcon className="size-3.5" />}
+          <span>{isCopied ? "Copied" : "Copy"}</span>
+        </>
+      )}
     </Button>
   );
 };

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Trash2Icon } from "lucide-react"
+import { Trash2Icon, Users, Check, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -25,7 +25,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Spinner } from "@/components/ui/spinner"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { toast } from "@/components/ui/toast"
@@ -37,6 +36,7 @@ import {
 } from "@/actions/group-chat"
 import type { Bot } from "@/db/schema"
 import type { ChatWithMembers } from "@/queries/chats"
+import { cn } from "@/lib/utils"
 
 export interface GroupChatDialogProps {
   open?: boolean
@@ -145,7 +145,7 @@ export function GroupChatDialog({
         })
 
         toast.add({
-          title: "Group updated",
+          title: "Team chat updated",
           description: `Group chat "${trimmedName}" updated successfully.`,
           type: "success",
         })
@@ -160,7 +160,7 @@ export function GroupChatDialog({
         })
 
         toast.add({
-          title: "Group created",
+          title: "Team chat created",
           description: `Group chat "${trimmedName}" created successfully.`,
           type: "success",
         })
@@ -174,7 +174,7 @@ export function GroupChatDialog({
       }
     } catch (error: any) {
       toast.add({
-        title: isEditing ? "Failed to update group" : "Failed to create group",
+        title: isEditing ? "Failed to update team chat" : "Failed to create team chat",
         description: error?.message || "Something went wrong. Please try again.",
         type: "error",
       })
@@ -190,7 +190,7 @@ export function GroupChatDialog({
     try {
       await deleteGroupChat(chat.id)
       toast.add({
-        title: "Group deleted",
+        title: "Team chat deleted",
         description: `Group chat "${chat.name || "Group"}" was deleted.`,
         type: "success",
       })
@@ -200,7 +200,7 @@ export function GroupChatDialog({
       onDeleted?.()
     } catch (error: any) {
       toast.add({
-        title: "Failed to delete group",
+        title: "Failed to delete team chat",
         description: error?.message || "Something went wrong.",
         type: "error",
       })
@@ -213,45 +213,47 @@ export function GroupChatDialog({
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         {trigger && <DialogTrigger render={trigger as React.ReactElement} />}
-        <DialogContent className="sm:max-w-md gap-5">
+        <DialogContent className="sm:max-w-xl border-border bg-popover text-popover-foreground shadow-2xl p-5 gap-5">
           <DialogHeader className="gap-1.5 text-left">
-            <DialogTitle className="text-lg font-semibold tracking-tight">
-              {isEditing ? "Edit group chat" : "New group chat"}
+            <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+              <Users className="size-4 text-cyan-500" />
+              {isEditing ? "Edit Multi-Agent Team Chat" : "Create Multi-Agent Team Chat"}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               {isEditing
-                ? "Update group name, add or remove bots, or delete this group chat."
-                : "Name the group and pick which bots are in it."}
+                ? "Manage team roster, modify active teammates, and update session details."
+                : "Assemble a multi-agent team that collaborates and hands off tasks automatically."}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Group Name Field */}
-            <div className="flex flex-col gap-2">
+            {/* Section 1: Team Details */}
+            <div className="rounded-xl border border-border bg-muted/40 p-3.5 space-y-2">
               <label
                 htmlFor="group-name"
-                className="text-xs font-medium text-foreground"
+                className="text-xs font-semibold text-foreground flex items-center gap-1.5"
               >
-                Name
+                <Sparkles className="size-3.5 text-cyan-500" />
+                Team Channel Name
               </label>
               <Input
                 id="group-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Team brainstorm"
-                className="h-9 text-sm"
+                placeholder="e.g. Architecture Review Team"
+                className="h-8 text-xs bg-background border-input"
                 maxLength={64}
                 autoFocus
                 disabled={isSubmitting || isDeleting}
               />
             </div>
 
-            {/* Bots Selection Field */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-foreground">
-                  Bots ({selectedBotIds.length} selected)
-                </label>
+            {/* Section 2: Teammate Roster Selection */}
+            <div className="rounded-xl border border-border bg-muted/40 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-semibold text-foreground">
+                  Teammate Roster ({selectedBotIds.length} selected)
+                </span>
                 {bots.length > 0 && (
                   <button
                     type="button"
@@ -262,24 +264,24 @@ export function GroupChatDialog({
                         setSelectedBotIds(bots.map((b) => b.id))
                       }
                     }}
-                    className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                    className="text-[11px] font-mono text-cyan-500 hover:text-cyan-600 dark:text-cyan-400 dark:hover:text-cyan-300 cursor-pointer transition-colors"
                   >
                     {selectedBotIds.length === bots.length
-                      ? "Deselect all"
-                      : "Select all"}
+                      ? "Deselect All"
+                      : "Select All"}
                   </button>
                 )}
               </div>
 
-              <div className="max-h-56 overflow-y-auto rounded-lg border border-border/80 bg-muted/20 p-1 flex flex-col gap-1">
+              <div className="max-h-60 overflow-y-auto rounded-lg border border-border bg-background p-1.5 flex flex-col gap-1.5">
                 {isLoadingBots ? (
-                  <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+                  <div className="flex items-center justify-center py-8 text-xs text-muted-foreground gap-2">
                     <Spinner className="size-4" />
-                    <span>Loading bots...</span>
+                    <span>Loading teammates...</span>
                   </div>
                 ) : bots.length === 0 ? (
-                  <div className="flex items-center justify-center py-6 text-xs text-muted-foreground text-center px-4">
-                    No bots found. Create a bot first.
+                  <div className="flex items-center justify-center py-8 text-xs text-muted-foreground text-center px-4">
+                    No bots found. Create your first bot teammate first.
                   </div>
                 ) : (
                   bots.map((bot) => {
@@ -288,22 +290,34 @@ export function GroupChatDialog({
                       <div
                         key={bot.id}
                         onClick={() => toggleBot(bot.id)}
-                        className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/60 cursor-pointer select-none transition-colors"
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2 rounded-lg border transition-all cursor-pointer select-none",
+                          isChecked
+                            ? "bg-cyan-500/10 border-cyan-500/30 text-foreground"
+                            : "bg-card border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                        )}
                       >
-                        <Checkbox
-                          checked={isChecked}
-                          onCheckedChange={() => toggleBot(bot.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                        <div
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                            isChecked
+                              ? "bg-cyan-500 border-cyan-500 text-slate-950"
+                              : "border-border bg-background"
+                          )}
+                        >
+                          {isChecked && <Check className="size-3 stroke-[3]" />}
+                        </div>
+
                         <ChatAvatar
                           seed={bot.avatar || bot.name}
-                          className="size-6 rounded-sm shrink-0"
+                          className="size-7 rounded-md shrink-0 shadow-xs"
                         />
+
                         <div className="flex flex-1 items-center justify-between min-w-0">
-                          <span className="text-sm font-medium truncate text-foreground">
+                          <span className="text-xs font-semibold truncate text-foreground">
                             {bot.name}
                           </span>
-                          <span className="text-[11px] text-muted-foreground truncate ml-2">
+                          <span className="text-[11px] font-mono text-muted-foreground truncate ml-2">
                             {bot.job}
                           </span>
                         </div>
@@ -315,31 +329,31 @@ export function GroupChatDialog({
             </div>
 
             {/* Dialog Footer Actions */}
-            <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-2">
+            <DialogFooter className="mt-1 flex-col-reverse sm:flex-row sm:justify-between items-center gap-2">
               {isEditing ? (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="destructive"
                   size="sm"
                   disabled={isSubmitting || isDeleting}
                   onClick={() => setShowDeleteAlert(true)}
-                  className="text-xs h-8 text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5 px-2"
+                  className="w-full sm:w-auto h-8 text-xs cursor-pointer bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20"
                 >
-                  <Trash2Icon className="size-3.5" />
-                  <span>Delete group</span>
+                  <Trash2Icon className="size-3.5" data-icon="inline-start" />
+                  <span>Delete Team Chat</span>
                 </Button>
               ) : (
                 <div />
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full justify-end sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setOpen(false)}
                   disabled={isSubmitting || isDeleting}
-                  className="text-xs h-8"
+                  className="h-8 text-xs border-border hover:bg-muted cursor-pointer"
                 >
                   Cancel
                 </Button>
@@ -352,7 +366,7 @@ export function GroupChatDialog({
                     !name.trim() ||
                     selectedBotIds.length === 0
                   }
-                  className="text-xs h-8 font-medium gap-1.5"
+                  className="h-8 text-xs bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-semibold cursor-pointer shadow-xs"
                 >
                   {isSubmitting ? (
                     <>
@@ -360,7 +374,7 @@ export function GroupChatDialog({
                       <span>{isEditing ? "Saving..." : "Creating..."}</span>
                     </>
                   ) : (
-                    <span>{isEditing ? "Save changes" : "Create group"}</span>
+                    <span>{isEditing ? "Save Changes" : "Create Team Chat"}</span>
                   )}
                 </Button>
               </div>
@@ -372,27 +386,30 @@ export function GroupChatDialog({
       {/* Delete Group Chat Confirmation */}
       {isEditing && (
         <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-          <AlertDialogContent>
+          <AlertDialogContent className="border-border bg-popover text-popover-foreground shadow-2xl">
             <AlertDialogHeader>
-              <AlertDialogTitle>
-                Delete {chat?.name ? `"${chat.name}"` : "group chat"}?
+              <AlertDialogTitle className="text-foreground">
+                Delete {chat?.name ? `"${chat.name}"` : "team chat"}?
               </AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete this group chat and its message
+              <AlertDialogDescription className="text-muted-foreground">
+                This will permanently delete this team chat and its message
                 history. The participating bots will remain untouched. This
                 action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting} className="border-border hover:bg-muted cursor-pointer">
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 type="button"
                 variant="destructive"
                 disabled={isDeleting}
                 onClick={handleDelete}
+                className="bg-rose-500 hover:bg-rose-600 text-white cursor-pointer"
               >
                 {isDeleting && <Spinner data-icon="inline-start" />}
-                Delete group
+                Delete Team Chat
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

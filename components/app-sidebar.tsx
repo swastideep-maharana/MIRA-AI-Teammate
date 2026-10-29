@@ -43,6 +43,7 @@ import {
   SidebarMenuButton,
   SidebarMenuAction,
   SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
 import {
   AlertDialog,
@@ -64,6 +65,8 @@ import { deleteBot } from "@/actions/bot"
 import { deleteGroupChat } from "@/actions/group-chat"
 import type { UserChatWithBot } from "@/queries/bots"
 import type { Bot } from "@/db/schema"
+import { cn } from "@/lib/utils"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 function formatChatTime(date: Date | string) {
   try {
@@ -97,11 +100,11 @@ function SidebarUserButton() {
         elements: {
           rootBox: "!flex !w-full !h-full",
           userButtonTrigger:
-            "!flex !w-full !h-full !items-center !gap-2 !rounded-md !p-2 !text-left !text-sm !text-inherit !bg-transparent hover:!bg-sidebar-accent hover:!text-sidebar-accent-foreground active:!bg-sidebar-accent active:!text-sidebar-accent-foreground !cursor-pointer ring-sidebar-ring outline-hidden transition-colors group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!justify-center",
+            "!flex !w-full !h-full !items-center !gap-2 !flex-row !rounded-md !p-2 !text-left !text-sm !text-inherit !bg-transparent hover:!bg-sidebar-accent hover:!text-sidebar-accent-foreground active:!bg-sidebar-accent active:!text-sidebar-accent-foreground !cursor-pointer ring-sidebar-ring outline-hidden transition-colors group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!justify-center",
           userButtonBox:
-            "!flex !w-full !h-full !items-center !gap-2 !flex-row group-data-[collapsible=icon]:!justify-center",
+            "!flex !items-center !gap-2 !order-1 !shrink-0 group-data-[collapsible=icon]:!justify-center",
           userButtonOuterIdentifier:
-            "truncate !text-sm !font-medium text-sidebar-foreground group-hover/menu-button:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden !text-left !flex-1",
+            "!order-2 truncate !text-sm !font-medium text-sidebar-foreground group-hover/menu-button:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden !text-left !flex-1 min-w-0",
           avatarBox:
             "!size-[1.5rem] !w-[1.5rem] !h-[1.5rem] !shrink-0 !rounded-md",
           userButtonAvatarBox:
@@ -186,48 +189,66 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
 
   return (
     <>
-      <Sidebar collapsible="icon" {...props}>
-        <SidebarHeader className="flex flex-col gap-2 p-2">
-          <div className="flex flex-row items-center justify-end w-full group-data-[collapsible=icon]:justify-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 rounded-lg bg-transparent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-                    aria-label="Create menu"
-                  />
-                }
-              >
-                <PlusIcon />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => setBotDialogOpen(true)}>
-                    <PlusIcon />
-                    <span>Create new bot</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setGroupChatDialogOpen(true)}>
-                    <UsersIcon />
-                    <span>Create group chat</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+      <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar" {...props}>
+        <SidebarHeader className="flex flex-col gap-2.5 p-3 border-b border-sidebar-border">
+          <div className="flex flex-row items-center justify-between w-full group-data-[collapsible=icon]:justify-center">
+            <Link
+              href="/"
+              className="flex items-center gap-2 font-bold text-sm text-sidebar-foreground tracking-tight group-data-[collapsible=icon]:hidden hover:opacity-85 transition-opacity"
+            >
+              <span className="size-2 rounded-full bg-cyan-500 shadow-[0_0_8px_#06b6d4]" />
+              <span className="font-mono tracking-wider font-semibold">MIRA</span>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase px-1.5 py-0.5 rounded bg-sidebar-accent border border-sidebar-border">
+                teammates
+              </span>
+            </Link>
+
+            <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col">
+              <SidebarTrigger
+                title="Toggle sidebar"
+                className="size-8 rounded-lg bg-transparent hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-cyan-500/50 cursor-pointer"
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 rounded-lg bg-transparent hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-cyan-500/50 cursor-pointer"
+                      aria-label="Create bot or team chat"
+                      title="Create bot or team chat"
+                    />
+                  }
+                >
+                  <PlusIcon className="size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 border-border bg-popover text-popover-foreground shadow-xl p-1">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem onClick={() => setBotDialogOpen(true)} className="gap-2 cursor-pointer py-2 hover:bg-accent/60">
+                      <PlusIcon className="size-4 text-cyan-500" />
+                      <span>Create new bot</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setGroupChatDialogOpen(true)} className="gap-2 cursor-pointer py-2 hover:bg-accent/60">
+                      <UsersIcon className="size-4 text-cyan-500" />
+                      <span>Create team chat</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           <Button
             type="button"
             variant="ghost"
             onClick={() => setSearchOpen(true)}
-            className="h-8 w-full min-w-0 justify-between rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm font-normal text-muted-foreground shadow-none transition-colors hover:bg-muted hover:text-foreground dark:bg-input/30 dark:hover:bg-input/50 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-0! group-data-[collapsible=icon]:bg-transparent! group-data-[collapsible=icon]:dark:bg-transparent! group-data-[collapsible=icon]:text-foreground group-data-[collapsible=icon]:hover:bg-sidebar-accent! group-data-[collapsible=icon]:dark:hover:bg-sidebar-accent! group-data-[collapsible=icon]:hover:text-sidebar-accent-foreground!"
+            className="h-8 w-full min-w-0 justify-between rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-1 text-xs font-normal text-muted-foreground shadow-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:border-0! group-data-[collapsible=icon]:bg-transparent!"
           >
             <div className="flex items-center gap-2 group-data-[collapsible=icon]:gap-0">
-              <SearchIcon className="size-4 shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">Search</span>
+              <SearchIcon className="size-3.5 shrink-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Quick find...</span>
             </div>
-            <Kbd className="group-data-[collapsible=icon]:hidden text-[10px] tracking-widest font-mono">
+            <Kbd className="group-data-[collapsible=icon]:hidden text-[10px] tracking-widest font-mono bg-sidebar-accent border-sidebar-border text-muted-foreground">
               ⌘K
             </Kbd>
           </Button>
@@ -251,7 +272,12 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
                         render={<Link href={`/chats/${chat.id}`} />}
                         isActive={isActive}
                         tooltip={name}
-                        className="h-auto items-start gap-3 p-2 pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center"
+                        className={cn(
+                          "h-auto items-start gap-3 p-2 pr-8 rounded-xl transition-all duration-150 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center",
+                          isActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold border border-sidebar-border shadow-xs"
+                            : "hover:bg-sidebar-accent/50 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                        )}
                       >
                         {isGroup ? (
                           <GroupChatAvatar
@@ -335,18 +361,21 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter>
-          <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-            <SidebarMenuItem>
+        <SidebarFooter className="border-t border-sidebar-border p-2">
+          <div className="flex items-center justify-between w-full group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:justify-center">
+            <div className="flex-1 min-w-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
               <SidebarMenuButton
                 size="lg"
                 render={<div />}
-                className="h-12 w-full p-0 cursor-pointer group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!"
+                className="h-10 w-full p-0 cursor-pointer group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center"
               >
                 <SidebarUserButton />
               </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+            </div>
+            <div className="shrink-0 flex items-center justify-center">
+              <ThemeToggle />
+            </div>
+          </div>
         </SidebarFooter>
 
         <SidebarRail />

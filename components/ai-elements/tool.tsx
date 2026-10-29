@@ -21,14 +21,24 @@ import { isValidElement } from "react";
 
 import { CodeBlock } from "./code-block";
 
-export type ToolProps = ComponentProps<typeof Collapsible>;
+export type ToolProps = ComponentProps<typeof Collapsible> & {
+  state?: ToolPart["state"];
+};
 
-export const Tool = ({ className, ...props }: ToolProps) => (
-  <Collapsible
-    className={cn("group not-prose mb-4 w-full rounded-md border", className)}
-    {...props}
-  />
-);
+export const Tool = ({ className, state, ...props }: ToolProps) => {
+  const isRunning = state === "input-available" || state === "input-streaming" || state === "approval-requested";
+
+  return (
+    <Collapsible
+      className={cn(
+        "group not-prose mb-3 w-full rounded-xl border border-border bg-card overflow-hidden transition-all duration-200",
+        isRunning && "border-cyan-500/40 bg-cyan-500/5 shadow-xs ring-1 ring-cyan-500/20 animate-pulse",
+        className
+      )}
+      {...props}
+    />
+  );
+};
 
 export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
@@ -45,31 +55,64 @@ export type ToolHeaderProps = {
 );
 
 const statusLabels: Record<ToolPart["state"], string> = {
-  "approval-requested": "Awaiting Approval",
-  "approval-responded": "Responded",
+  "approval-requested": "Action Required",
+  "approval-responded": "Approved",
   "input-available": "Running",
-  "input-streaming": "Pending",
+  "input-streaming": "Executing",
   "output-available": "Completed",
   "output-denied": "Denied",
-  "output-error": "Error",
+  "output-error": "Failed",
 };
 
-const statusIcons: Record<ToolPart["state"], ReactNode> = {
-  "approval-requested": <ClockIcon className="size-4 text-yellow-600" />,
-  "approval-responded": <CheckCircleIcon className="size-4 text-blue-600" />,
-  "input-available": <ClockIcon className="size-4 animate-pulse" />,
-  "input-streaming": <CircleIcon className="size-4" />,
-  "output-available": <CheckCircleIcon className="size-4 text-green-600" />,
-  "output-denied": <XCircleIcon className="size-4 text-orange-600" />,
-  "output-error": <XCircleIcon className="size-4 text-red-600" />,
-};
+export const getStatusBadge = (status: ToolPart["state"]) => {
+  const isExecuting = status === "input-available" || status === "input-streaming";
 
-export const getStatusBadge = (status: ToolPart["state"]) => (
-  <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
-    {statusIcons[status]}
-    {statusLabels[status]}
-  </Badge>
-);
+  if (isExecuting) {
+    return (
+      <Badge
+        className="gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/25"
+        variant="secondary"
+      >
+        <span className="size-1.5 rounded-full bg-cyan-400 animate-ping" />
+        {statusLabels[status]}
+      </Badge>
+    );
+  }
+
+  if (status === "output-error" || status === "output-denied") {
+    return (
+      <Badge
+        className="gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/25"
+        variant="secondary"
+      >
+        <XCircleIcon className="size-3 text-red-400" />
+        {statusLabels[status]}
+      </Badge>
+    );
+  }
+
+  if (status === "output-available") {
+    return (
+      <Badge
+        className="gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground border border-border"
+        variant="secondary"
+      >
+        <CheckCircleIcon className="size-3 text-emerald-500" />
+        {statusLabels[status]}
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge
+      className="gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/25"
+      variant="secondary"
+    >
+      <ClockIcon className="size-3 text-amber-400" />
+      {statusLabels[status]}
+    </Badge>
+  );
+};
 
 export const ToolHeader = ({
   className,
@@ -85,17 +128,21 @@ export const ToolHeader = ({
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center justify-between gap-4 p-3",
+        "flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-xs transition-colors hover:bg-muted/50 cursor-pointer select-none",
         className
       )}
       {...props}
     >
-      <div className="flex items-center gap-2">
-        <WrenchIcon className="size-4 text-muted-foreground" />
-        <span className="font-medium text-sm">{title ?? derivedName}</span>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground border border-border">
+          <WrenchIcon className="size-3.5 text-cyan-500" />
+        </div>
+        <span className="font-mono text-xs font-medium text-foreground truncate max-w-[280px] sm:max-w-[420px]">
+          {title ?? derivedName}
+        </span>
         {getStatusBadge(state)}
       </div>
-      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
     </CollapsibleTrigger>
   );
 };
@@ -105,7 +152,7 @@ export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
     className={cn(
-      "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 space-y-4 p-4 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+      "border-t border-border bg-muted/20 p-3.5 space-y-3 font-mono text-xs text-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}

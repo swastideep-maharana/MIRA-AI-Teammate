@@ -17,8 +17,9 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
+import * as React from "react";
 import {
   createContext,
   memo,
@@ -26,6 +27,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Streamdown } from "streamdown";
@@ -54,9 +56,9 @@ export const MessageContent = ({
 }: MessageContentProps) => (
   <div
     className={cn(
-      "is-user:dark flex w-fit min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm",
-      "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
-      "group-[.is-assistant]:text-foreground",
+      "flex min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm",
+      "group-[.is-user]:ml-auto group-[.is-user]:rounded-2xl group-[.is-user]:bg-secondary group-[.is-user]:border group-[.is-user]:border-border group-[.is-user]:px-4 group-[.is-user]:py-2.5 group-[.is-user]:text-secondary-foreground group-[.is-user]:shadow-xs group-[.is-user]:w-fit",
+      "group-[.is-assistant]:text-foreground group-[.is-assistant]:leading-relaxed group-[.is-assistant]:w-full",
       className
     )}
     {...props}
@@ -323,14 +325,81 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 
+function StreamdownPre({ children, className, ...props }: any) {
+  const [isCopied, setIsCopied] = useState(false);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  let language = "code";
+  if (React.isValidElement(children)) {
+    const childProps = (children as any).props;
+    const codeClass = childProps?.className || "";
+    const match = codeClass.match(/language-(\w+)/);
+    if (match) {
+      language = match[1];
+    } else if (childProps?.["data-language"]) {
+      language = childProps["data-language"];
+    }
+  }
+
+  const handleCopy = useCallback(async () => {
+    if (!preRef.current) return;
+    const text = preRef.current.innerText || "";
+    try {
+      await navigator.clipboard.writeText(text);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  return (
+    <div className="group/pre relative my-3 w-full overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs">
+      <div className="flex items-center justify-between border-b border-border bg-muted/60 px-3.5 py-1.5 text-xs select-none">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-md bg-accent px-2 py-0.5 font-mono text-[11px] font-medium text-cyan-600 dark:text-cyan-400 border border-border">
+            {language}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label={isCopied ? "Copied code" : "Copy code"}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer",
+            isCopied ? "text-cyan-600 dark:text-cyan-400 font-medium" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {isCopied ? <CheckIcon className="size-3.5 text-cyan-600 dark:text-cyan-400" /> : <CopyIcon className="size-3.5" />}
+          <span>{isCopied ? "Copied" : "Copy"}</span>
+        </button>
+      </div>
+      <pre
+        ref={preRef}
+        className={cn(
+          "overflow-x-auto p-3.5 font-mono text-xs leading-relaxed text-foreground [&_code]:font-mono",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </pre>
+    </div>
+  );
+}
+
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
+  ({ className, components, ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn(
-        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 leading-relaxed",
         className
       )}
       plugins={streamdownPlugins}
+      components={{
+        pre: StreamdownPre,
+        ...components,
+      }}
       {...props}
     />
   ),

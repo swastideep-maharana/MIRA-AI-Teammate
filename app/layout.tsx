@@ -25,11 +25,16 @@ export const metadata: Metadata = {
   },
 }
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
-
-const fontMono = Geist_Mono({
+const geistSans = Geist({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-geist-sans",
+  display: "swap",
+})
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+  display: "swap",
 })
 
 export default function RootLayout({
@@ -41,14 +46,12 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(
-        "antialiased",
-        fontMono.variable,
-        "font-sans",
-        geist.variable
-      )}
+      className={cn(geistSans.variable, geistMono.variable)}
     >
-      <body suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className="min-h-screen bg-background text-foreground font-sans antialiased"
+      >
         <ClerkProvider
           signInUrl="/sign-in"
           signUpUrl="/sign-up"

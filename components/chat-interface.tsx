@@ -66,6 +66,7 @@ import {
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 export interface ChatProps {
   chatId: string
@@ -192,10 +193,21 @@ function ChatView({
   const botAvatar = selectedBot?.avatar || selectedBot?.name || bot?.avatar || bot?.name || chatId
   const isGenerating = status === "submitted" || status === "streaming"
 
+  // Deduplicate messages by ID to prevent any double-bubble ghost renders
+  const uniqueMessages = React.useMemo(() => {
+    const seen = new Set<string>()
+    return messages.filter((m) => {
+      if (!m.id) return true
+      if (seen.has(m.id)) return false
+      seen.add(m.id)
+      return true
+    })
+  }, [messages])
+
   // Automatically switch active bot in composer when a handoff finishes
   React.useEffect(() => {
-    if (!messages.length) return
-    const lastMsg = messages[messages.length - 1]
+    if (!uniqueMessages.length) return
+    const lastMsg = uniqueMessages[uniqueMessages.length - 1]
     if (lastMsg.role === "assistant") {
       for (const part of lastMsg.parts) {
         if (
@@ -211,13 +223,13 @@ function ChatView({
         }
       }
     }
-  }, [messages, selectedBotId, onSelectBot])
+  }, [uniqueMessages, selectedBotId, onSelectBot])
 
   return (
     <div className="relative flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-background">
       <Conversation className="flex-1 min-h-0 overflow-y-auto">
         <ConversationContent className="mx-auto w-full max-w-3xl py-6 px-4 space-y-6">
-          {messages.length === 0 ? (
+          {uniqueMessages.length === 0 ? (
             <ConversationEmptyState
               icon={
                 isGroup ? (
@@ -242,7 +254,7 @@ function ChatView({
               }
             />
           ) : (
-            messages.map((message, messageIndex) => {
+            uniqueMessages.map((message, messageIndex) => {
               let msgBot: any = null
               let userTargetBot: any = null
 
@@ -258,14 +270,14 @@ function ChatView({
                 }
                 if (!msgBot) {
                   for (let i = messageIndex - 1; i >= 0; i--) {
-                    if (messages[i].role === "user") {
-                      const userTargetId = (messages[i] as any).metadata?.botId
+                    if (uniqueMessages[i].role === "user") {
+                      const userTargetId = (uniqueMessages[i] as any).metadata?.botId
                       if (userTargetId) {
                         msgBot = bots.find((b) => b.id === userTargetId)
                       }
-                      if (!msgBot && (messages[i] as any).metadata?.botName) {
+                      if (!msgBot && (uniqueMessages[i] as any).metadata?.botName) {
                         msgBot = bots.find(
-                          (b) => b.name === (messages[i] as any).metadata?.botName
+                          (b) => b.name === (uniqueMessages[i] as any).metadata?.botName
                         )
                       }
                       break
@@ -286,15 +298,15 @@ function ChatView({
                   )
                 }
                 if (!userTargetBot) {
-                  for (let i = messageIndex + 1; i < messages.length; i++) {
-                    if (messages[i].role === "assistant") {
-                      const nextBotId = (messages[i] as any).metadata?.botId
+                  for (let i = messageIndex + 1; i < uniqueMessages.length; i++) {
+                    if (uniqueMessages[i].role === "assistant") {
+                      const nextBotId = (uniqueMessages[i] as any).metadata?.botId
                       if (nextBotId) {
                         userTargetBot = bots.find((b) => b.id === nextBotId)
                       }
-                      if (!userTargetBot && (messages[i] as any).metadata?.botName) {
+                      if (!userTargetBot && (uniqueMessages[i] as any).metadata?.botName) {
                         userTargetBot = bots.find(
-                          (b) => b.name === (messages[i] as any).metadata?.botName
+                          (b) => b.name === (uniqueMessages[i] as any).metadata?.botName
                         )
                       }
                       break
@@ -321,101 +333,107 @@ function ChatView({
                 return null
               }
 
-              return (
-                <div
-                  key={message.id}
-                  className={`flex w-full gap-3 ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  {message.role === "assistant" && (
-                    <ChatAvatar
-                      seed={msgBotAvatar}
-                      alt={msgBotName}
-                      className="size-7 rounded-sm shrink-0 mt-1 shadow-xs"
-                    />
-                  )}
+              const isConsecutiveUser =
+                message.role === "user" &&
+                messageIndex > 0 &&
+                uniqueMessages[messageIndex - 1]?.role === "user"
+
+              if (message.role === "user") {
+                return (
                   <div
-                    className={`flex flex-col ${
-                      message.role === "user"
-                        ? "items-end max-w-[80%]"
-                        : "items-start max-w-[90%]"
-                    }`}
+                    key={message.id}
+                    className={cn(
+                      "flex w-full justify-end",
+                      isConsecutiveUser && "-mt-4"
+                    )}
                   >
-                    {isGroup && message.role === "assistant" && (
+                    <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl bg-secondary text-secondary-foreground border border-border px-4 py-2.5 shadow-xs text-sm leading-relaxed">
+                      {message.parts.map((part, index) => {
+                        if (part.type === "text") {
+                          if (!part.text?.trim()) return null
+                          return (
+                            <div
+                              key={index}
+                              className="whitespace-pre-wrap break-words"
+                            >
+                              {isGroup && userTargetBot && index === 0 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="inline-flex items-center gap-1 h-5 pl-1 pr-1.5 mr-1.5 align-middle text-[11px] font-medium bg-background/80 border border-border/60 text-foreground shrink-0 max-w-[140px] select-none"
+                                >
+                                  <ChatAvatar
+                                    seed={
+                                      userTargetBot.avatar ||
+                                      userTargetBot.name
+                                    }
+                                    className="size-3.5 rounded-full shrink-0"
+                                  />
+                                  <span className="truncate max-w-[90px]">
+                                    @{userTargetBot.name}
+                                  </span>
+                                </Badge>
+                              )}
+                              <span>{part.text}</span>
+                            </div>
+                          )
+                        }
+                        return null
+                      })}
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+                <div key={message.id} className="flex w-full justify-start gap-3">
+                  <ChatAvatar
+                    seed={msgBotAvatar}
+                    alt={msgBotName}
+                    className="size-7 rounded-sm shrink-0 mt-1 shadow-xs"
+                  />
+                  <div className="flex-1 min-w-0 max-w-[90%] flex flex-col">
+                    {isGroup && (
                       <span className="text-[11px] font-medium text-muted-foreground mb-1 pl-1 select-none">
                         {msgBotName}
                       </span>
                     )}
-                    <Message
-                      from={message.role}
-                      className="w-full"
-                    >
-                      <MessageContent className="w-full">
-                        {message.parts.map((part, index) => {
-                          if (part.type === "text") {
-                            if (!part.text?.trim()) return null
-                            if (message.role === "user") {
-                              return (
-                                <div
-                                  key={index}
-                                  className="whitespace-pre-wrap break-words leading-relaxed"
-                                >
-                                  {isGroup && userTargetBot && index === 0 && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="inline-flex items-center gap-1 h-5 pl-1 pr-1.5 mr-1.5 align-middle text-[11px] font-medium bg-background/80 border border-border/60 text-foreground shrink-0 max-w-[140px] select-none"
-                                    >
-                                      <ChatAvatar
-                                        seed={
-                                          userTargetBot.avatar ||
-                                          userTargetBot.name
-                                        }
-                                        className="size-3.5 rounded-full shrink-0"
-                                      />
-                                      <span className="truncate max-w-[90px]">
-                                        @{userTargetBot.name}
-                                      </span>
-                                    </Badge>
-                                  )}
-                                  <span>{part.text}</span>
-                                </div>
-                              )
-                            }
+                    <div className="w-full text-foreground text-sm leading-relaxed space-y-3">
+                      {message.parts.map((part, index) => {
+                        if (part.type === "text") {
+                          if (!part.text?.trim()) return null
+                          return (
+                            <MessageResponse key={index}>
+                              {part.text}
+                            </MessageResponse>
+                          )
+                        }
 
-                            return (
-                              <MessageResponse key={index}>
-                                {part.text}
-                              </MessageResponse>
-                            )
-                          }
+                        if (part.type === "reasoning") {
+                          return (
+                            <Reasoning
+                              key={index}
+                              isStreaming={part.state === "streaming"}
+                            >
+                              <ReasoningTrigger />
+                              <ReasoningContent>{part.text}</ReasoningContent>
+                            </Reasoning>
+                          )
+                        }
 
-                          if (part.type === "reasoning") {
-                            return (
-                              <Reasoning
-                                key={index}
-                                isStreaming={part.state === "streaming"}
-                              >
-                                <ReasoningTrigger />
-                                <ReasoningContent>{part.text}</ReasoningContent>
-                              </Reasoning>
-                            )
-                          }
+                        if (isToolUIPart(part)) {
+                          return (
+                            <ToolPartView
+                              key={index}
+                              part={part}
+                              sourceBot={msgBot}
+                              onSelectBot={onSelectBot}
+                            />
+                          )
+                        }
 
-                          if (isToolUIPart(part)) {
-                            return (
-                              <ToolPartView
-                                key={index}
-                                part={part}
-                                onSelectBot={onSelectBot}
-                              />
-                            )
-                          }
-
-                          return null
-                        })}
-                      </MessageContent>
-                    </Message>
+                        return null
+                      })}
+                    </div>
                   </div>
                 </div>
               )
@@ -452,9 +470,10 @@ function ChatView({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="border-t bg-background/95 backdrop-blur-sm p-4 shrink-0">
+      <div className="border-t border-border bg-background/95 backdrop-blur-md p-3 sm:p-4 shrink-0">
         <div className="mx-auto max-w-3xl">
           <PromptInput
+            className="rounded-xl border border-border bg-card shadow-md focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30 transition-all"
             onSubmit={({ text }) => {
               const trimmed = text.trim()
               if (!trimmed || isGenerating) return
@@ -488,10 +507,10 @@ function ChatView({
                     ? `Message ${selectedBot?.name ?? "group"}...`
                     : `Message ${botName}...`
                 }
-                className="min-h-12 max-h-48 resize-none"
+                className="min-h-12 max-h-48 resize-none font-sans text-sm placeholder:text-muted-foreground/70"
               />
             </PromptInputBody>
-            <PromptInputFooter>
+            <PromptInputFooter className="items-center">
               <PromptInputTools>
                 {isGroup && bots.length > 1 && (
                   <PromptInputSelect
@@ -502,27 +521,35 @@ function ChatView({
                       }
                     }}
                   >
-                    <PromptInputSelectTrigger className="h-7 gap-1.5 px-2 text-xs font-medium max-w-[170px] border border-border/60 bg-muted/40 hover:bg-muted/70 transition-colors">
+                    <PromptInputSelectTrigger className="h-8 min-w-[150px] max-w-[200px] gap-2 px-2.5 text-xs font-medium border border-border bg-muted/60 hover:bg-muted text-foreground transition-colors rounded-lg shadow-xs cursor-pointer">
                       <ChatAvatar
                         seed={selectedBot?.avatar || selectedBot?.name || ""}
-                        className="size-3.5 rounded-xs shrink-0"
+                        className="size-4 rounded-xs shrink-0"
                       />
-                      <span className="truncate">{selectedBot?.name ?? "Pick bot"}</span>
+                      <span className="truncate flex-1 text-left">{selectedBot?.name ?? "Pick bot"}</span>
+                      <span className="size-1.5 rounded-full bg-cyan-500 shrink-0" />
                     </PromptInputSelectTrigger>
-                    <PromptInputSelectContent>
+                    <PromptInputSelectContent className="w-64 border-border bg-popover text-popover-foreground p-1.5 shadow-xl">
                       {bots.map((b) => (
-                        <PromptInputSelectItem key={b.id} value={b.id}>
-                          <div className="flex items-center gap-2">
+                        <PromptInputSelectItem key={b.id} value={b.id} className="cursor-pointer rounded-md py-2 px-2 hover:bg-accent/60">
+                          <div className="flex items-center gap-2.5 w-full">
                             <ChatAvatar
                               seed={b.avatar || b.name}
-                              className="size-4 rounded-xs shrink-0"
+                              className="size-5 rounded-xs shrink-0"
                             />
-                            <span className="font-medium text-xs text-foreground">
-                              {b.name}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground truncate max-w-[100px]">
-                              ({b.job})
-                            </span>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-medium text-xs text-foreground truncate">
+                                  {b.name}
+                                </span>
+                                <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-500/10 px-1 rounded border border-cyan-500/20">
+                                  Ready
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-muted-foreground truncate">
+                                {b.job}
+                              </span>
+                            </div>
                           </div>
                         </PromptInputSelectItem>
                       ))}
@@ -530,7 +557,11 @@ function ChatView({
                   </PromptInputSelect>
                 )}
               </PromptInputTools>
-              <PromptInputSubmit status={status} onStop={stop} />
+              <PromptInputSubmit
+                status={status}
+                onStop={stop}
+                className="min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-8 rounded-lg cursor-pointer"
+              />
             </PromptInputFooter>
           </PromptInput>
         </div>
@@ -627,9 +658,11 @@ export function getToolDisplayInfo(toolName: string, input: any) {
 
 export function ToolPartView({
   part,
+  sourceBot,
   onSelectBot,
 }: {
   part: any
+  sourceBot?: any
   onSelectBot?: (botId: string) => void
 }) {
   const toolName = getToolName(part)
@@ -659,7 +692,7 @@ export function ToolPartView({
 
     if (isError) {
       return (
-        <div className="my-2 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+        <div className="my-2.5 flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
           <ArrowRightLeftIcon className="size-4 shrink-0" />
           <span>
             Handoff error:{" "}
@@ -670,24 +703,37 @@ export function ToolPartView({
     }
 
     return (
-      <div className="my-3 overflow-hidden rounded-xl border border-primary/25 bg-primary/5 p-3.5 shadow-xs transition-all">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <ArrowRightLeftIcon className="size-4" />
+      <div className="my-3 overflow-hidden rounded-xl border border-cyan-500/25 bg-cyan-500/5 dark:bg-cyan-950/20 p-3.5 shadow-xs transition-all duration-200 hover:border-cyan-500/40">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center -space-x-1.5 shrink-0">
+              <ChatAvatar
+                seed={sourceBot?.avatar || sourceBot?.name || "agent"}
+                className="size-7 rounded-lg border border-background shadow-xs z-10"
+              />
+              <div className="flex size-6 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-500 border border-cyan-500/30 z-20 shadow-xs">
+                <ArrowRightLeftIcon className="size-3 animate-pulse" />
+              </div>
+              <ChatAvatar
+                seed={targetName}
+                className="size-7 rounded-lg border border-background shadow-xs z-30"
+              />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs font-semibold text-foreground">
-                  Task Handoff
+                  {sourceBot?.name || "Agent"}
                 </span>
-                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
-                  to {targetName}
+                <span className="text-[10px] text-muted-foreground">handed off to</span>
+                <span className="text-xs font-semibold text-cyan-600 dark:text-cyan-400">
+                  {targetName}
+                </span>
+                <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] font-medium text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                  Active
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Role:{" "}
-                <span className="text-foreground font-medium">{targetJob}</span>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                Role: <span className="text-foreground/90 font-medium">{targetJob}</span>
               </p>
             </div>
           </div>
@@ -695,7 +741,7 @@ export function ToolPartView({
             <button
               type="button"
               onClick={() => onSelectBot(targetId)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-700 dark:text-cyan-300 hover:bg-cyan-500/25 hover:border-cyan-500/60 transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
             >
               <ChatAvatar seed={targetName} className="size-3.5 rounded-xs" />
               <span>Switch to {targetName}</span>
@@ -703,8 +749,8 @@ export function ToolPartView({
           )}
         </div>
         {reason && (
-          <div className="mt-2.5 rounded-md bg-background/80 px-3 py-2 text-xs text-muted-foreground border border-border/50">
-            <span className="font-medium text-foreground">Reason: </span>
+          <div className="mt-2.5 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground border border-border font-mono">
+            <span className="text-foreground font-sans font-medium">Handoff reason: </span>
             {reason}
           </div>
         )}
@@ -717,10 +763,10 @@ export function ToolPartView({
     if (part.state === "output-available" && part.output?.screenshot) {
       const screenshotData = `data:image/png;base64,${part.output.screenshot}`
       return (
-        <div className="my-3 overflow-hidden rounded-xl border bg-card shadow-xs">
-          <div className="flex items-center justify-between border-b bg-muted/40 px-3.5 py-2 text-xs font-medium text-muted-foreground">
+        <div className="my-3 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+          <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3.5 py-2 text-xs font-medium text-muted-foreground select-none">
             <span className="flex items-center gap-2 text-foreground font-semibold">
-              <MonitorIcon className="size-4 text-primary" />
+              <MonitorIcon className="size-4 text-cyan-500" />
               Desktop Screen
             </span>
             <div className="flex items-center gap-2">
@@ -732,18 +778,18 @@ export function ToolPartView({
               <a
                 href={screenshotData}
                 download="desktop-screenshot.png"
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <DownloadIcon className="size-3.5" />
                 <span>Save</span>
               </a>
             </div>
           </div>
-          <div className="relative aspect-video max-h-[500px] w-full overflow-hidden bg-black/95 flex items-center justify-center p-1">
+          <div className="relative aspect-video max-h-[500px] w-full overflow-hidden bg-muted/20 flex items-center justify-center p-1.5">
             <img
               src={screenshotData}
               alt="Sandbox desktop screenshot"
-              className="h-full w-full object-contain rounded"
+              className="h-full w-full object-contain rounded-lg border border-border/50"
             />
           </div>
         </div>
@@ -755,7 +801,7 @@ export function ToolPartView({
       (part.state === "output-available" && !part.output?.success)
     ) {
       return (
-        <div className="my-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
+        <div className="my-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
           <MonitorIcon className="size-4 shrink-0" />
           <span>
             Failed to capture screen:{" "}
@@ -766,18 +812,18 @@ export function ToolPartView({
     }
 
     return (
-      <div className="my-2 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground animate-pulse">
-        <MonitorIcon className="size-4" />
+      <div className="my-2.5 flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs text-muted-foreground animate-pulse">
+        <MonitorIcon className="size-4 text-cyan-500" />
         <span>Capturing desktop screen...</span>
       </div>
     )
   }
 
-  // 3. bash: specialized terminal output
+  // 4. bash: specialized terminal output
   if (toolName === "bash") {
     const { title } = getToolDisplayInfo(toolName, part.input)
     return (
-      <Tool open={isOpen} onOpenChange={setIsOpen} className="my-3">
+      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
         <ToolHeader
           title={title}
           type={part.type as any}
@@ -787,10 +833,10 @@ export function ToolPartView({
         <ToolContent>
           {part.input?.command && (
             <div className="space-y-1.5">
-              <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+              <h4 className="font-medium text-muted-foreground text-[11px] uppercase tracking-wider font-mono">
                 Command
               </h4>
-              <div className="rounded-md bg-muted/60 px-3 py-2 font-mono text-xs text-foreground">
+              <div className="rounded-lg bg-muted/40 border border-border px-3 py-2 font-mono text-xs text-cyan-600 dark:text-cyan-400">
                 $ {part.input.command}
               </div>
             </div>
@@ -798,7 +844,7 @@ export function ToolPartView({
           {part.output?.stdout ? (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                <h4 className="font-medium text-muted-foreground text-[11px] uppercase tracking-wider font-mono">
                   Output
                 </h4>
                 {typeof part.output.exitCode === "number" && (
@@ -825,10 +871,10 @@ export function ToolPartView({
     )
   }
 
-  // 4. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
+  // 5. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
   const { title } = getToolDisplayInfo(toolName, part.input)
   return (
-    <Tool open={isOpen} onOpenChange={setIsOpen} className="my-3">
+    <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
       <ToolHeader
         title={title}
         type={part.type as any}
