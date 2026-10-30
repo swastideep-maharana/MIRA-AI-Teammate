@@ -285,7 +285,7 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
   return {
     webSearch: tool({
       description:
-        "Search the web for up-to-date information, news, movie/book recommendations, documentation, or facts. Provide query keywords. Returns top search results with titles, snippets, and source URLs.",
+        "Search the web for up-to-date information, news, vehicle/product reviews, recommendations, documentation, or facts. Provide query keywords. Returns top search results with titles, snippets, and source URLs.",
       inputSchema: z.object({
         query: z.string().min(1, "Query cannot be empty").max(500, "Query exceeds 500 characters").describe("Search keywords or query"),
       }),
@@ -293,44 +293,50 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
         try {
           return await withTimeout(
             (async () => {
-              // 1. DuckDuckGo lite search
+              // 1. Fast DuckDuckGo HTML Search via GET (sub-second latency & full web coverage)
               try {
-                const ddgRes = await fetch("https://lite.duckduckgo.com/lite/", {
-                  method: "POST",
-                  signal: AbortSignal.timeout(6000),
+                const encodedQuery = encodeURIComponent(query.trim())
+                const ddgRes = await fetch(`https://html.duckduckgo.com/html/?q=${encodedQuery}`, {
+                  method: "GET",
+                  signal: AbortSignal.timeout(5000),
                   headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
                     "User-Agent":
-                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
                   },
-                  body: "q=" + encodeURIComponent(query),
                 })
 
                 if (ddgRes.ok) {
                   const html = await ddgRes.text()
-                  const rows = html.split("<tr>")
                   const results: Array<{ title: string; url: string; snippet: string }> = []
-                  let currentLink: { url: string; title: string } | null = null
+                  const blocks = html.split('class="result ')
 
-                  for (const row of rows) {
-                    const linkMatch =
-                      row.match(/<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i) ||
-                      row.match(/<a[^>]*href=['"]([^'"]+)['"][^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/i)
+                  for (const block of blocks.slice(1)) {
+                    const titleMatch = block.match(/<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i)
+                    const snippetMatch = block.match(/<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
 
-                    if (linkMatch) {
-                      currentLink = {
-                        url: linkMatch[1],
-                        title: decodeHtmlEntities(linkMatch[2]),
+                    if (titleMatch) {
+                      let rawUrl = titleMatch[1]
+                      // Decode direct destination from DuckDuckGo redirect
+                      const uddgMatch = rawUrl.match(/uddg=([^&]+)/)
+                      if (uddgMatch) {
+                        try {
+                          rawUrl = decodeURIComponent(uddgMatch[1])
+                        } catch {}
                       }
-                    }
-                    const snippetMatch = row.match(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i)
-                    if (snippetMatch && currentLink) {
-                      results.push({
-                        title: currentLink.title,
-                        url: currentLink.url,
-                        snippet: decodeHtmlEntities(snippetMatch[1]),
-                      })
-                      currentLink = null
+
+                      const title = decodeHtmlEntities(titleMatch[2].replace(/<[^>]+>/g, "").trim())
+                      let snippet = snippetMatch
+                        ? decodeHtmlEntities(snippetMatch[1].replace(/<[^>]+>/g, "").trim())
+                        : ""
+                      if (snippet.length > 200) {
+                        snippet = snippet.slice(0, 197) + "..."
+                      }
+
+                      if (title && rawUrl.startsWith("http")) {
+                        results.push({ title, url: rawUrl, snippet })
+                      }
                     }
                   }
 
@@ -338,21 +344,59 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
                     return {
                       success: true,
                       query,
-                      count: results.length,
-                      results: results.slice(0, 8),
+                      count: Math.min(results.length, 5),
+                      results: results.slice(0, 5),
                     }
                   }
                 }
               } catch {
-                // If DuckDuckGo times out or fails, gracefully proceed to Wikipedia fallback
+                // Proceed to high-speed fallbacks
               }
 
-              // 2. Fallback to Wikipedia search API
+              // 2. DuckDuckGo Instant Answer API (Ultra-fast, ~300ms)
+              try {
+                const instantRes = await fetch(
+                  `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
+                  { signal: AbortSignal.timeout(3500) }
+                )
+                if (instantRes.ok) {
+                  const data = await instantRes.json()
+                  const results: Array<{ title: string; url: string; snippet: string }> = []
+                  if (data.Abstract && data.AbstractURL) {
+                    results.push({
+                      title: data.Heading || query,
+                      url: data.AbstractURL,
+                      snippet: data.Abstract.slice(0, 200),
+                    })
+                  }
+                  if (Array.isArray(data.RelatedTopics)) {
+                    for (const topic of data.RelatedTopics.slice(0, 4)) {
+                      if (topic.Text && topic.FirstURL) {
+                        results.push({
+                          title: topic.Text.slice(0, 60),
+                          url: topic.FirstURL,
+                          snippet: topic.Text.slice(0, 180),
+                        })
+                      }
+                    }
+                  }
+                  if (results.length > 0) {
+                    return {
+                      success: true,
+                      query,
+                      count: results.length,
+                      results,
+                    }
+                  }
+                }
+              } catch {}
+
+              // 3. Fallback to Wikipedia search API
               try {
                 const wikiRes = await fetch(
                   `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`,
                   {
-                    signal: AbortSignal.timeout(6000),
+                    signal: AbortSignal.timeout(4000),
                     headers: {
                       "User-Agent": "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
                     },
@@ -363,18 +407,18 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
                   const wikiResults = (data?.query?.search || []).map((item: any) => ({
                     title: item.title,
                     url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, "_"))}`,
-                    snippet: decodeHtmlEntities(item.snippet || ""),
+                    snippet: decodeHtmlEntities(item.snippet || "").slice(0, 180),
                   }))
-                  return {
-                    success: true,
-                    query,
-                    count: wikiResults.length,
-                    results: wikiResults.slice(0, 8),
+                  if (wikiResults.length > 0) {
+                    return {
+                      success: true,
+                      query,
+                      count: wikiResults.length,
+                      results: wikiResults.slice(0, 5),
+                    }
                   }
                 }
-              } catch {
-                // Wikipedia API timed out or network error
-              }
+              } catch {}
 
               return {
                 success: true,
@@ -384,8 +428,8 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
                 message: "No search results found.",
               }
             })(),
-            25000,
-            "Web search request timed out after 25 seconds."
+            12000,
+            "Web search request timed out after 12 seconds."
           )
         } catch (error: any) {
           if (String(error?.message).startsWith("TIMEOUT:")) {
@@ -395,32 +439,6 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
               "Try simplifying your search query keywords."
             )
           }
-
-          // Fallback via sandbox curl
-          try {
-            const sandbox = await getSandbox()
-            const script = `python3 -c "
-import urllib.request, urllib.parse, json
-url = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + urllib.parse.quote('''${query.replace(/'/g, "\\'")}''') + '&utf8=&format=json'
-req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-with urllib.request.urlopen(req) as resp:
-    print(resp.read().decode())
-"`
-            const res = await withTimeout(
-              sandbox.process.executeCommand(script),
-              15000,
-              "Sandbox Python fallback timed out."
-            )
-            if (res.exitCode === 0 && res.result) {
-              const parsed = JSON.parse(res.result)
-              const items = (parsed?.query?.search || []).map((item: any) => ({
-                title: item.title,
-                url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, "_"))}`,
-                snippet: decodeHtmlEntities(item.snippet || ""),
-              }))
-              return { success: true, query, count: items.length, results: items.slice(0, 8) }
-            }
-          } catch {}
 
           return createToolFailure(
             "EXECUTION_ERROR",
