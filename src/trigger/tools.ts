@@ -2,6 +2,18 @@ import { tool } from "ai"
 import { z } from "zod"
 import { getDaytona } from "../../lib/daytona"
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&#x27;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/<[^>]+>/g, "")
+    .trim()
+}
+
 export interface BotTeammate {
   id: string
   name: string
@@ -57,6 +69,199 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
   }
 
   return {
+    webSearch: tool({
+      description:
+        "Search the web for up-to-date information, news, movie/book recommendations, documentation, or facts. Provide query keywords. Returns top search results with titles, snippets, and source URLs.",
+      inputSchema: z.object({
+        query: z.string().describe("Search keywords or query"),
+      }),
+      execute: async ({ query }) => {
+        try {
+          // 1. DuckDuckGo lite search
+          const ddgRes = await fetch("https://lite.duckduckgo.com/lite/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
+            body: "q=" + encodeURIComponent(query),
+          })
+
+          if (ddgRes.ok) {
+            const html = await ddgRes.text()
+            const rows = html.split("<tr>")
+            const results: Array<{ title: string; url: string; snippet: string }> = []
+            let currentLink: { url: string; title: string } | null = null
+
+            for (const row of rows) {
+              const linkMatch =
+                row.match(/<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i) ||
+                row.match(/<a[^>]*href=['"]([^'"]+)['"][^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/i)
+
+              if (linkMatch) {
+                currentLink = {
+                  url: linkMatch[1],
+                  title: decodeHtmlEntities(linkMatch[2]),
+                }
+              }
+              const snippetMatch = row.match(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i)
+              if (snippetMatch && currentLink) {
+                results.push({
+                  title: currentLink.title,
+                  url: currentLink.url,
+                  snippet: decodeHtmlEntities(snippetMatch[1]),
+                })
+                currentLink = null
+              }
+            }
+
+            if (results.length > 0) {
+              return {
+                query,
+                count: results.length,
+                results: results.slice(0, 8),
+              }
+            }
+          }
+
+          // 2. Fallback to Wikipedia search API
+          const wikiRes = await fetch(
+            `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`,
+            {
+              headers: {
+                "User-Agent": "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
+              },
+            }
+          )
+          if (wikiRes.ok) {
+            const data = await wikiRes.json()
+            const wikiResults = (data?.query?.search || []).map((item: any) => ({
+              title: item.title,
+              url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, "_"))}`,
+              snippet: decodeHtmlEntities(item.snippet || ""),
+            }))
+            return {
+              query,
+              count: wikiResults.length,
+              results: wikiResults.slice(0, 8),
+            }
+          }
+
+          return {
+            query,
+            count: 0,
+            results: [],
+            message: "No search results found.",
+          }
+        } catch (error: any) {
+          try {
+            const sandbox = await getSandbox()
+            const script = `python3 -c "
+import urllib.request, urllib.parse, json
+url = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + urllib.parse.quote('''${query.replace(/'/g, "\\'")}''') + '&utf8=&format=json'
+req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+with urllib.request.urlopen(req) as resp:
+    print(resp.read().decode())
+"`
+            const res = await sandbox.process.executeCommand(script)
+            if (res.exitCode === 0 && res.result) {
+              const parsed = JSON.parse(res.result)
+              const items = (parsed?.query?.search || []).map((item: any) => ({
+                title: item.title,
+                url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, "_"))}`,
+                snippet: decodeHtmlEntities(item.snippet || ""),
+              }))
+              return { query, count: items.length, results: items.slice(0, 8) }
+            }
+          } catch {}
+
+          return {
+            query,
+            error: error?.message || String(error),
+            results: [],
+          }
+        }
+      },
+    }),
+
+    fetchUrl: tool({
+      description:
+        "Fetch and extract readable text and content from any webpage URL. Returns the page title and cleaned text content.",
+      inputSchema: z.object({
+        url: z.string().describe("The HTTP or HTTPS URL to fetch"),
+      }),
+      execute: async ({ url }) => {
+        try {
+          const res = await fetch(url, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Accept:
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+            redirect: "follow",
+          })
+
+          if (!res.ok) {
+            return {
+              url,
+              success: false,
+              error: `HTTP ${res.status}: ${res.statusText}`,
+            }
+          }
+
+          const html = await res.text()
+          const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+          const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : ""
+
+          let body = html
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+            .replace(/<header[\s\S]*?<\/header>/gi, "")
+            .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+            .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+            .replace(/<br\s*[\/]?>/gi, "\n")
+            .replace(/<\/p>/gi, "\n\n")
+            .replace(/<\/h[1-6]>/gi, "\n\n")
+            .replace(/<\/li>/gi, "\n")
+            .replace(/<[^>]+>/g, " ")
+
+          body = decodeHtmlEntities(body)
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n\s*\n\s*\n+/g, "\n\n")
+            .trim()
+
+          return {
+            url,
+            success: true,
+            title,
+            content: body.slice(0, 6000),
+          }
+        } catch (error: any) {
+          try {
+            const sandbox = await getSandbox()
+            const cmd = `curl -sL -m 15 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}" | sed -e 's/<script[^>]*>.*<\\/script>//gi' -e 's/<[^>]*>/ /g' | tr -s ' ' | head -c 5000`
+            const res = await sandbox.process.executeCommand(cmd)
+            if (res.exitCode === 0 && res.result) {
+              return {
+                url,
+                success: true,
+                content: res.result.trim(),
+              }
+            }
+          } catch {}
+
+          return {
+            url,
+            success: false,
+            error: error?.message || String(error),
+          }
+        }
+      },
+    }),
+
     bash: tool({
       description:
         "Run a bash or shell command in the sandbox terminal. Returns standard output and exit code.",

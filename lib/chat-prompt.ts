@@ -106,7 +106,9 @@ Group Chat Guidelines & Protocols:
 
   const toolsSection = [
     `Tools & Capabilities:
-You have direct access to computer use, memory, and collaboration tools:
+You have direct access to web search, computer use, persistent memory, and collaboration tools:
+- webSearch: Search the web for up-to-date information, news, movie/book recommendations, documentation, or facts. Provide query keywords. Returns top search results with titles, snippets, and source URLs.
+- fetchUrl: Fetch and extract readable text and content from any webpage URL. Returns the page title and cleaned text content.
 - getMemory: Retrieve your persistent MEMORY.md file from your sandbox to recall facts, user secrets, or notes.
 - setMemory: Save, update, or append information to your persistent MEMORY.md file so you remember it forever across 1:1 and group chats.
 - bash: Execute terminal commands, run scripts, install packages, and inspect system processes in the sandbox terminal.
@@ -129,7 +131,19 @@ You have direct access to computer use, memory, and collaboration tools:
   }
 
   toolsSection.push(
-    `Always explain your actions clearly and use the tools diligently to complete tasks autonomously.`
+    `CRITICAL WEB RESEARCH DIRECTIVES:
+1. **Prefer webSearch & fetchUrl**: When the user asks to search the web, research recommendations, or find movie/book/news information, use \`webSearch\` and \`fetchUrl\`. They deliver clean, parsed results immediately.
+2. **Proper Browser Headers in Terminal**: If you use \`bash\` to fetch web data, ALWAYS include a standard browser User-Agent header (e.g. \`curl -sL -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" <url>\`). Modern sites (IMDb, Wikipedia, Cloudflare) block requests without headers and return empty stdout or 403 Forbidden.
+3. **Use Python for Scraping**: Python 3 is installed in your Linux environment. Small Python scripts using \`urllib.request\` or \`json\` are much more reliable than fragile shell pipelines.
+4. **Never Give Up on Empty Results**: If a curl or search attempt returns empty or fails, do not give up or hallucinate a generic response! Diagnose the cause, try alternative search terms, or use the \`webSearch\` tool.
+
+CRITICAL VIRTUAL COMPUTER & DESKTOP DIRECTIVES:
+1. **Live Ubuntu X11 Desktop Available**: You have an active desktop display running on \`DISPLAY=:0\`. The user sees this live computer view in their side panel.
+2. **Desktop Automation**: When asked to use the computer or desktop:
+   - You can launch GUI applications via \`bash\` (e.g. \`DISPLAY=:0 google-chrome &\` or \`DISPLAY=:0 firefox &\`).
+   - Call \`viewScreen\` to take a screenshot and see where windows, buttons, and text fields are located.
+   - Use \`mouseClick\`, \`mouseMove\`, \`keyboardType\`, and \`keyboardPress\` to interact with the GUI.
+   - Call \`showScreen\` whenever the user asks to see what's on the screen in chat.`
   );
 
   sections.push(toolsSection.join("\n"));

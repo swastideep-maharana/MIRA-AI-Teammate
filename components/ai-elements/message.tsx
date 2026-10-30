@@ -17,7 +17,7 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, WrapTextIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import * as React from "react";
 import {
@@ -327,6 +327,7 @@ const streamdownPlugins = { cjk, code, math, mermaid };
 
 function StreamdownPre({ children, className, ...props }: any) {
   const [isCopied, setIsCopied] = useState(false);
+  const [isWrapped, setIsWrapped] = useState(false);
   const preRef = useRef<HTMLPreElement>(null);
 
   let language = "code";
@@ -361,23 +362,41 @@ function StreamdownPre({ children, className, ...props }: any) {
             {language}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={handleCopy}
-          aria-label={isCopied ? "Copied code" : "Copy code"}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer",
-            isCopied ? "text-cyan-600 dark:text-cyan-400 font-medium" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {isCopied ? <CheckIcon className="size-3.5 text-cyan-600 dark:text-cyan-400" /> : <CopyIcon className="size-3.5" />}
-          <span>{isCopied ? "Copied" : "Copy"}</span>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setIsWrapped(!isWrapped)}
+            aria-label={isWrapped ? "Disable line wrapping" : "Enable line wrapping"}
+            title={isWrapped ? "Unwrap lines" : "Wrap lines"}
+            className={cn(
+              "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer",
+              isWrapped
+                ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <WrapTextIcon className="size-3.5" />
+            <span>{isWrapped ? "Unwrap" : "Wrap"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label={isCopied ? "Copied code" : "Copy code"}
+            className={cn(
+              "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer",
+              isCopied ? "text-cyan-600 dark:text-cyan-400 font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            {isCopied ? <CheckIcon className="size-3.5 text-cyan-600 dark:text-cyan-400" /> : <CopyIcon className="size-3.5" />}
+            <span>{isCopied ? "Copied" : "Copy"}</span>
+          </button>
+        </div>
       </div>
       <pre
         ref={preRef}
         className={cn(
-          "overflow-x-auto p-3.5 font-mono text-xs leading-relaxed text-foreground [&_code]:font-mono",
+          "p-3.5 font-mono text-xs leading-relaxed text-foreground [&_code]:font-mono scrollbar-thin",
+          isWrapped ? "whitespace-pre-wrap break-all overflow-x-hidden" : "whitespace-pre overflow-x-auto",
           className
         )}
         {...props}
@@ -385,6 +404,85 @@ function StreamdownPre({ children, className, ...props }: any) {
         {children}
       </pre>
     </div>
+  );
+}
+
+function StreamdownTable({ children, className, ...props }: any) {
+  return (
+    <div className="my-3.5 w-full overflow-hidden rounded-xl border border-border bg-card/60 shadow-xs">
+      <div className="w-full overflow-x-auto scrollbar-thin">
+        <table
+          className={cn(
+            "w-full min-w-full border-collapse text-left text-xs divide-y divide-border/60",
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StreamdownThead({ children, className, ...props }: any) {
+  return (
+    <thead
+      className={cn("bg-muted/70 text-foreground font-semibold border-b border-border", className)}
+      {...props}
+    >
+      {children}
+    </thead>
+  );
+}
+
+function StreamdownTh({ children, className, ...props }: any) {
+  return (
+    <th
+      className={cn(
+        "px-3.5 py-2.5 font-semibold text-xs text-foreground tracking-wide whitespace-normal align-middle select-none",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </th>
+  );
+}
+
+function StreamdownTbody({ children, className, ...props }: any) {
+  return (
+    <tbody className={cn("divide-y divide-border/40", className)} {...props}>
+      {children}
+    </tbody>
+  );
+}
+
+function StreamdownTr({ children, className, ...props }: any) {
+  return (
+    <tr
+      className={cn(
+        "transition-colors hover:bg-muted/30 last:border-b-0",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </tr>
+  );
+}
+
+function StreamdownTd({ children, className, ...props }: any) {
+  return (
+    <td
+      className={cn(
+        "px-3.5 py-2 text-xs text-foreground/90 align-top leading-relaxed break-words",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </td>
   );
 }
 
@@ -398,6 +496,12 @@ export const MessageResponse = memo(
       plugins={streamdownPlugins}
       components={{
         pre: StreamdownPre,
+        table: StreamdownTable,
+        thead: StreamdownThead,
+        tbody: StreamdownTbody,
+        tr: StreamdownTr,
+        th: StreamdownTh,
+        td: StreamdownTd,
         ...components,
       }}
       {...props}

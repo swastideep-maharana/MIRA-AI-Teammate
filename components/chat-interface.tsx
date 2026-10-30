@@ -68,6 +68,8 @@ import {
   PaperclipIcon,
   FileIcon,
   XIcon,
+  GlobeIcon,
+  SearchIcon,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -294,7 +296,7 @@ function ChatView({
   return (
     <div className="relative flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-background">
       <Conversation className="flex-1 min-h-0 overflow-y-auto">
-        <ConversationContent className="mx-auto w-full max-w-3xl py-6 px-4 space-y-6">
+        <ConversationContent className="mx-auto w-full max-w-4xl lg:max-w-5xl py-6 px-4 sm:px-6 space-y-6">
           {uniqueMessages.length === 0 ? (
             <ConversationEmptyState
               icon={
@@ -524,7 +526,7 @@ function ChatView({
                     alt={msgBotName}
                     className="size-7 rounded-sm shrink-0 mt-1 shadow-xs"
                   />
-                  <div className="flex-1 min-w-0 max-w-[90%] flex flex-col">
+                  <div className="flex-1 min-w-0 w-full flex flex-col">
                     {isGroup && (
                       <span className="text-[11px] font-medium text-muted-foreground mb-1 pl-1 select-none">
                         {msgBotName}
@@ -604,7 +606,7 @@ function ChatView({
       </Conversation>
 
       <div className="border-t border-border bg-background/95 backdrop-blur-md p-3 sm:p-4 shrink-0">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto w-full max-w-4xl lg:max-w-5xl">
           <PromptInput
             className="rounded-xl border border-border bg-card shadow-md focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30 transition-all overflow-hidden"
             accept=".pdf,.doc,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.webp"
@@ -739,6 +741,18 @@ export function getToolDisplayInfo(toolName: string, input: any) {
       return {
         title: input?.command ? `$ ${input.command}` : "Run bash command",
         icon: TerminalIcon,
+      }
+    case "webSearch":
+      return {
+        title: input?.query ? `Search web: "${input.query}"` : "Search web",
+        icon: SearchIcon,
+      }
+    case "fetchUrl":
+      return {
+        title: input?.url
+          ? `Fetch web: ${input.url.length > 40 ? input.url.slice(0, 40) + "..." : input.url}`
+          : "Fetch web page",
+        icon: GlobeIcon,
       }
     case "readFile":
       return {
