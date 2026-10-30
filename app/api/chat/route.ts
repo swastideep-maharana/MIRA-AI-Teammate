@@ -6,7 +6,12 @@ import { db } from "@/db"
 import { chats, messages as messagesTable, usageLedgers } from "@/db/schema"
 import { buildSystemPrompt, type ChatClientData } from "@/lib/chat-prompt"
 import { createDaytonaTools, withTimeout } from "@/src/trigger/tools"
-import { applySlidingWindowContext, prunePastScreenshots } from "@/src/trigger/chat"
+import {
+  applySlidingWindowContext,
+  prunePastScreenshots,
+  sanitizeDanglingToolCalls,
+  ensureAllToolResults,
+} from "@/src/trigger/chat"
 import { getDaytona } from "@/lib/daytona"
 import { getLanguageModel, getActiveModelInfo } from "@/lib/ai-model"
 
@@ -203,9 +208,11 @@ ${
     // 4. Sliding window context truncation & ephemeral screenshot pruning for minimal TTFT
     const windowedMessages = applySlidingWindowContext(incomingMessages)
     const optimizedMessages = prunePastScreenshots(windowedMessages)
+    const sanitizedMessages = sanitizeDanglingToolCalls(optimizedMessages)
 
-    // 5. Convert UIMessages to model messages
-    const modelMessages = await convertToModelMessages(optimizedMessages, { tools })
+    // 5. Convert UIMessages to model messages & ensure all tool calls have results
+    const rawModelMessages = await convertToModelMessages(sanitizedMessages, { tools })
+    const modelMessages = ensureAllToolResults(rawModelMessages)
 
     // 6. Stream response with Direct Multimodal Context (Gemini 3 Flash for files) or Groq
     const activeModel = getActiveModelInfo({ hasAttachments })

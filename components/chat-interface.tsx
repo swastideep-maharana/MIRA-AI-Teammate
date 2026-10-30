@@ -1368,7 +1368,7 @@ export function ToolPartView({
   if (toolName === "bash") {
     const { title, icon } = getToolDisplayInfo(toolName, part.input)
     return (
-      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
+      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-1 max-w-2xl">
         <ToolHeader
           title={title}
           type={part.type as any}
@@ -1378,23 +1378,23 @@ export function ToolPartView({
         />
         <ToolContent>
           {part.input?.command && (
-            <div className="space-y-1.5">
-              <h4 className="font-medium text-muted-foreground text-[11px] uppercase tracking-wider font-mono">
+            <div className="space-y-1">
+              <h4 className="font-medium text-muted-foreground text-[10px] uppercase tracking-wider font-mono">
                 Command
               </h4>
-              <div className="rounded-lg bg-muted/40 border border-border px-3 py-2 font-mono text-xs text-cyan-600 dark:text-cyan-400">
+              <div className="rounded bg-muted/40 border border-border/60 px-2.5 py-1.5 font-mono text-[11px] text-cyan-600 dark:text-cyan-400 break-all">
                 $ {part.input.command}
               </div>
             </div>
           )}
           {part.output?.stdout ? (
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-muted-foreground text-[11px] uppercase tracking-wider font-mono">
+                <h4 className="font-medium text-muted-foreground text-[10px] uppercase tracking-wider font-mono">
                   Output
                 </h4>
                 {typeof part.output.exitCode === "number" && (
-                  <span className="text-[11px] text-muted-foreground font-mono">
+                  <span className="text-[10px] text-muted-foreground font-mono">
                     exit code: {part.output.exitCode}
                   </span>
                 )}
@@ -1422,7 +1422,7 @@ export function ToolPartView({
     const { title, icon } = getToolDisplayInfo(toolName, part.input)
     const images = (part.output as any)?.images || []
     return (
-      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
+      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-1 max-w-2xl">
         <ToolHeader
           title={title}
           type={part.type as any}
@@ -1432,15 +1432,15 @@ export function ToolPartView({
         />
         <ToolContent>
           {images.length > 0 ? (
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+            <div className="space-y-1.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-0.5">
                 {images.map((img: any, idx: number) => (
                   <a
                     key={idx}
                     href={img.sourceUrl || img.imageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group relative block aspect-video overflow-hidden rounded-lg border border-border bg-muted/40 hover:border-cyan-500/50 transition-all shadow-2xs"
+                    className="group relative block aspect-video overflow-hidden rounded-md border border-border/80 bg-muted/40 hover:border-cyan-500/50 transition-all shadow-2xs"
                   >
                     <img
                       src={img.imageUrl}
@@ -1448,8 +1448,8 @@ export function ToolPartView({
                       loading="lazy"
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
                     />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5">
-                      <span className="block truncate text-[10px] font-medium text-white/90">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1">
+                      <span className="block truncate text-[9px] font-medium text-white/90">
                         {img.title}
                       </span>
                     </div>
@@ -1468,7 +1468,7 @@ export function ToolPartView({
   // 6. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
   const { title, icon } = getToolDisplayInfo(toolName, part.input)
   return (
-    <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
+    <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-1 max-w-2xl">
       <ToolHeader
         title={title}
         type={part.type as any}

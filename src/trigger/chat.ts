@@ -205,6 +205,72 @@ export function applySlidingWindowContext(messages: any[]): any[] {
   return [pinnedFirstMessage, rollingSummaryMessage, ...lastActiveTurns];
 }
 
+/**
+ * Ensures that any unfinished or dangling tool calls in past turns are marked as completed,
+ * preventing 'Tool result is missing for tool call' protocol errors.
+ */
+export function sanitizeDanglingToolCalls(messages: any[]): any[] {
+  return messages.map((msg) => {
+    if (msg.role !== "assistant" || !Array.isArray(msg.parts)) return msg;
+    const updatedParts = msg.parts.map((part: any) => {
+      const isTool =
+        typeof part.type === "string" &&
+        (part.type.startsWith("tool-") || part.type === "dynamic-tool" || part.type === "tool-call");
+      if (isTool && part.state !== "output-available" && part.state !== "output-error") {
+        return {
+          ...part,
+          state: "output-available",
+          output: part.output ?? { success: true, result: "Command executed in background." },
+        };
+      }
+      return part;
+    });
+    return { ...msg, parts: updatedParts };
+  });
+}
+
+/**
+ * Validates converted model messages to guarantee that every 'tool-call' content block
+ * has a corresponding 'tool-result' message before the subsequent user message.
+ */
+export function ensureAllToolResults(modelMessages: any[]): any[] {
+  const result = [...modelMessages];
+  for (let i = 0; i < result.length; i++) {
+    const m = result[i];
+    if (m.role === "assistant" && Array.isArray(m.content)) {
+      for (const block of m.content) {
+        if (block.type === "tool-call") {
+          const callId = block.toolCallId;
+          const hasMatchingResult = result.some(
+            (other) =>
+              other.role === "tool" &&
+              Array.isArray(other.content) &&
+              other.content.some((b: any) => b.type === "tool-result" && b.toolCallId === callId)
+          );
+          if (!hasMatchingResult) {
+            result.splice(i + 1, 0, {
+              role: "tool",
+              content: [
+                {
+                  type: "tool-result",
+                  toolCallId: callId,
+                  toolName: block.toolName || "tool",
+                  output: {
+                    type: "json",
+                    value: { success: true, result: "Command dispatched in background." },
+                  },
+                },
+              ],
+            });
+            i++;
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+
 export const chatAgent = chat.agent({
   id: "chat-agent",
   clientDataSchema: chatClientDataSchema,
@@ -291,7 +357,8 @@ export const chatAgent = chat.agent({
     });
 
     // 3. Ephemeral visual history: prune past screenshots in-memory retaining ONLY the single latest screenshot
-    const modelOptimizedMessages = prunePastScreenshots(formattedMessages);
+    const sanitizedFormatted = sanitizeDanglingToolCalls(formattedMessages);
+    const modelOptimizedMessages = ensureAllToolResults(prunePastScreenshots(sanitizedFormatted));
 
     // Synchronize uploaded files directly to Daytona Linux sandbox (/workspace/uploads/)
     const uploadedPaths: string[] = [];
