@@ -261,6 +261,44 @@ function ChatView({
   const botAvatar = selectedBot?.avatar || selectedBot?.name || bot?.avatar || bot?.name || chatId
   const isGenerating = status === "submitted" || status === "streaming"
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [localAttachments, setLocalAttachments] = React.useState<
+    Array<{ name: string; contentType: string; url: string; id: string }>
+  >([])
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files
+    if (!selectedFiles || selectedFiles.length === 0) return
+
+    const filePromises = Array.from(selectedFiles).map((file) => {
+      return new Promise<{
+        name: string
+        contentType: string
+        url: string
+        id: string
+      }>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          resolve({
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            name: file.name,
+            contentType: file.type || "application/octet-stream",
+            url: reader.result as string,
+          })
+        }
+        reader.readAsDataURL(file)
+      })
+    })
+
+    const newAttachments = await Promise.all(filePromises)
+    setLocalAttachments((prev) => [...prev, ...newAttachments])
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const handleRemoveAttachment = (id: string) => {
+    setLocalAttachments((prev) => prev.filter((a) => a.id !== id))
+  }
+
   // Deduplicate messages by ID to prevent any double-bubble ghost renders
   const uniqueMessages = React.useMemo(() => {
     const seen = new Set<string>()
@@ -407,6 +445,18 @@ function ChatView({
                 uniqueMessages[messageIndex - 1]?.role === "user"
 
               if (message.role === "user") {
+                const expAttachments = ((message as any).experimental_attachments || []) as Array<{
+                  name: string
+                  contentType?: string
+                  url?: string
+                }>
+                const partUrls = new Set(
+                  (message.parts || [])
+                    .filter((p) => p.type === "file")
+                    .map((p: any) => (p as any).url)
+                    .filter(Boolean)
+                )
+
                 return (
                   <div
                     key={message.id}
@@ -416,6 +466,80 @@ function ChatView({
                     )}
                   >
                     <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl bg-secondary text-secondary-foreground border border-border px-4 py-2.5 shadow-xs text-sm leading-relaxed space-y-2">
+                      {/* Compact file badges from experimental_attachments */}
+                      {expAttachments.map((att, attIdx) => {
+                        if (att.url && partUrls.has(att.url)) return null
+                        const isPdf =
+                          att.contentType === "application/pdf" ||
+                          att.name?.toLowerCase().endsWith(".pdf")
+                        const isImage = att.contentType?.startsWith("image/")
+                        const isCode = /\.(ts|js|py|json|csv|md|txt)$/i.test(att.name)
+
+                        if (isImage && att.url) {
+                          return (
+                            <div
+                              key={`exp-att-${attIdx}`}
+                              className="rounded-xl overflow-hidden border border-border/60 bg-black/40 max-w-sm mt-1"
+                            >
+                              <img
+                                src={att.url}
+                                alt={att.name || "Uploaded image"}
+                                className="max-h-60 w-auto object-contain rounded-lg"
+                              />
+                              {att.name && (
+                                <div className="px-2.5 py-1 text-[11px] font-mono text-muted-foreground truncate border-t border-border/40">
+                                  {att.name}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div
+                            key={`exp-att-${attIdx}`}
+                            className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/80 p-2.5 max-w-sm shadow-xs mt-1"
+                          >
+                            <div
+                              className={cn(
+                                "flex size-9 items-center justify-center rounded-lg shrink-0",
+                                isPdf
+                                  ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                                  : isCode
+                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                  : "bg-cyan-500/10 text-cyan-500 border border-cyan-500/20"
+                              )}
+                            >
+                              {isPdf ? (
+                                <FileTextIcon className="size-4.5" />
+                              ) : isCode ? (
+                                <FileCodeIcon className="size-4.5" />
+                              ) : (
+                                <FileIcon className="size-4.5" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="block truncate text-xs font-semibold text-foreground">
+                                {att.name || "Attachment"}
+                              </span>
+                              <span className="block text-[10px] text-muted-foreground uppercase font-mono">
+                                {isPdf ? "PDF Document" : isCode ? "Code / Data" : att.contentType || "File"}
+                              </span>
+                            </div>
+                            {att.url && (
+                              <a
+                                href={att.url}
+                                download={att.name || "document"}
+                                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
+                                title="Download attachment"
+                              >
+                                <DownloadIcon className="size-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        )
+                      })}
+
                       {message.parts.map((part, index) => {
                         if (part.type === "file") {
                           const isPdf =
@@ -614,26 +738,44 @@ function ChatView({
             globalDrop
             onSubmit={({ text, files }) => {
               const trimmed = text.trim()
-              if (!trimmed && (!files || files.length === 0)) return
+              const allFiles = [
+                ...localAttachments.map((a) => ({
+                  filename: a.name,
+                  mediaType: a.contentType,
+                  url: a.url,
+                })),
+                ...(files || []).map((f) => ({
+                  filename: f.filename,
+                  mediaType: f.mediaType || "application/octet-stream",
+                  url: f.url,
+                })),
+              ]
+
+              if (!trimmed && allFiles.length === 0) return
               if (isGenerating) return
 
               const parts: Array<any> = []
-              if (files && files.length > 0) {
-                for (const f of files) {
-                  parts.push({
-                    type: "file",
-                    mediaType: f.mediaType || "application/octet-stream",
-                    url: f.url,
-                    filename: f.filename,
-                  })
-                }
+              for (const f of allFiles) {
+                parts.push({
+                  type: "file",
+                  mediaType: f.mediaType,
+                  url: f.url,
+                  filename: f.filename,
+                })
               }
               if (trimmed) {
                 parts.push({ type: "text", text: trimmed })
               }
 
               sendMessage(
-                { parts },
+                {
+                  parts,
+                  experimental_attachments: allFiles.map((f) => ({
+                    name: f.filename,
+                    contentType: f.mediaType,
+                    url: f.url,
+                  })),
+                } as any,
                 {
                   metadata: {
                     botId: selectedBot?.id,
@@ -653,8 +795,54 @@ function ChatView({
                   },
                 }
               )
+              setLocalAttachments([])
             }}
           >
+            {/* Display local uploaded attachments chips with remove button */}
+            {localAttachments.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 px-3 pt-2.5 pb-2 border-b border-border/40 bg-muted/20 max-h-32 overflow-y-auto scrollbar-thin">
+                {localAttachments.map((att) => {
+                  const isPdf =
+                    att.contentType === "application/pdf" ||
+                    att.name.toLowerCase().endsWith(".pdf")
+                  const isImage = att.contentType.startsWith("image/")
+                  const isCode = /\.(ts|js|py|json|csv|md|txt)$/i.test(att.name)
+
+                  return (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-2 rounded-lg border border-border/80 bg-card px-2.5 py-1 text-xs text-foreground shadow-2xs group shrink-0"
+                    >
+                      {isImage ? (
+                        <img
+                          src={att.url}
+                          alt={att.name}
+                          className="size-4 rounded object-cover"
+                        />
+                      ) : isPdf ? (
+                        <FileTextIcon className="size-3.5 text-rose-500 shrink-0" />
+                      ) : isCode ? (
+                        <FileCodeIcon className="size-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <FileIcon className="size-3.5 text-cyan-500 shrink-0" />
+                      )}
+                      <span className="max-w-[140px] sm:max-w-[180px] truncate text-xs font-medium">
+                        {att.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttachment(att.id)}
+                        className="ml-0.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded p-0.5 transition-colors cursor-pointer"
+                        title={`Remove ${att.name}`}
+                        aria-label={`Remove ${att.name}`}
+                      >
+                        <XIcon className="size-3" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <PromptAttachmentsPreview />
             <PromptInputBody>
               <PromptInputTextarea
@@ -668,7 +856,23 @@ function ChatView({
             </PromptInputBody>
             <PromptInputFooter className="items-center">
               <PromptInputTools>
-                <PromptAttachButton />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  multiple
+                  accept=".pdf,.txt,.md,.csv,.json,.ts,.js,.py,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                  onChange={handleFileChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach files (PDF, TXT, MD, CSV, JSON, TS, JS, PY)"
+                  className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
+                  aria-label="Attach files"
+                >
+                  <PaperclipIcon className="size-4" />
+                </button>
                 {isGroup && bots.length > 1 && (
                   <PromptInputSelect
                     value={selectedBotId}
