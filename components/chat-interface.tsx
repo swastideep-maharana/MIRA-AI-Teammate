@@ -718,10 +718,29 @@ function ChatView({
                       {message.parts.map((part, index) => {
                         if (part.type === "text") {
                           if (!part.text?.trim()) return null
+                          const isLastMessage =
+                            messageIndex === uniqueMessages.length - 1
+                          const isLastPart = index === message.parts.length - 1
+                          const isStreamingThis = isLastMessage && isGenerating
+
                           return (
-                            <MessageResponse key={index}>
-                              {part.text}
-                            </MessageResponse>
+                            <div key={index} className="relative inline-block w-full">
+                              <MessageResponse
+                                mode={isStreamingThis ? "streaming" : "static"}
+                                isAnimating={isStreamingThis}
+                                animated={
+                                  isStreamingThis
+                                    ? { animation: "fadeIn", stagger: 20 }
+                                    : false
+                                }
+                                caret={isStreamingThis ? "block" : undefined}
+                              >
+                                {part.text}
+                              </MessageResponse>
+                              {isStreamingThis && isLastPart && (
+                                <span className="animate-typing-cursor" />
+                              )}
+                            </div>
                           )
                         }
 
@@ -758,17 +777,31 @@ function ChatView({
           )}
 
           {status === "submitted" && (
-            <div className="flex w-full items-center gap-3 text-muted-foreground text-sm pl-1">
-              <ChatAvatar
-                seed={selectedBot?.avatar || selectedBot?.name || botAvatar}
-                alt={selectedBot?.name || botName}
-                className="size-7 rounded-sm shrink-0 shadow-xs"
-              />
-              <span className="inline-flex items-center gap-1.5 animate-pulse font-medium">
-                {isGroup && selectedBot?.name
-                  ? `${selectedBot.name} is thinking...`
-                  : "Thinking..."}
-              </span>
+            <div className="flex w-full items-center gap-3 text-sm pl-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="relative shrink-0">
+                <ChatAvatar
+                  seed={selectedBot?.avatar || selectedBot?.name || botAvatar}
+                  alt={selectedBot?.name || botName}
+                  className="size-8 rounded-xl shadow-xs ring-2 ring-cyan-500/30 ring-offset-2 ring-offset-background animate-pulse"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-cyan-500 ring-2 ring-background animate-ping" />
+                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-cyan-500 ring-2 ring-background" />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-2.5 shadow-sm backdrop-blur-md">
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-cyan-500 animate-bounce [animation-delay:-0.3s] shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                  <span className="size-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s] shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
+                  <span className="size-2 rounded-full bg-cyan-300 animate-bounce shadow-[0_0_8px_rgba(6,182,212,0.4)]" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-foreground tracking-wide">
+                    {isGroup && selectedBot?.name
+                      ? `${selectedBot.name} is thinking...`
+                      : `${botName} is thinking...`}
+                  </span>
+                  <span className="inline-block size-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                </div>
+              </div>
             </div>
           )}
 

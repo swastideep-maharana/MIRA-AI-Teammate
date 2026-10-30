@@ -168,3 +168,27 @@
 .cl-footerAction {
   border-top: none !important;
 }
+
+/* Typewriter Cursor & Streaming Typing Effects */
+@keyframes typing-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.15;
+    transform: scale(0.96);
+  }
+}
+
+.animate-typing-cursor {
+  display: inline-block;
+  width: 0.45rem;
+  height: 1.15em;
+  margin-left: 0.2rem;
+  background-color: #06b6d4;
+  border-radius: 2px;
+  vertical-align: -0.15em;
+  animation: typing-blink 0.75s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.75);
+}
