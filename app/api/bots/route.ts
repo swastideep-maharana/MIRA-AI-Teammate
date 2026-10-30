@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server"
 import { nanoid } from "nanoid"
+import { z } from "zod"
 import { db } from "@/db"
 import { bots, chats, chatMembers, botInsertSchema } from "@/db/schema"
 import { daytona } from "@/lib/daytona"
@@ -90,6 +91,12 @@ export async function POST(req: Request) {
       chatId,
     })
   } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
+      return Response.json(
+        { error: "Validation failed", details: err.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
     console.error("Error creating bot in /api/bots:", err)
     const message = err instanceof Error ? err.message : "Failed to create bot"
     return Response.json({ error: message }, { status: 500 })

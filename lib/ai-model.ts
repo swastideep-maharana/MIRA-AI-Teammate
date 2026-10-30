@@ -3,24 +3,37 @@ import path from "path"
 import { createGroq, groq } from "@ai-sdk/groq"
 import { google } from "@ai-sdk/google"
 
-function resolveEnvKey(key: string): string | undefined {
-  if (process.env[key]) return process.env[key]
+let cachedEnvFile: Record<string, string> | null = null
+
+function getEnvFileMap(): Record<string, string> {
+  if (cachedEnvFile !== null) return cachedEnvFile
+  cachedEnvFile = {}
   try {
     const envPath = path.resolve(process.cwd(), ".env.local")
     if (fs.existsSync(envPath)) {
       const content = fs.readFileSync(envPath, "utf-8")
       for (const line of content.split("\n")) {
         const trimmed = line.trim()
-        if (trimmed.startsWith(`${key}=`)) {
-          const val = trimmed.substring(key.length + 1).replace(/^["']|["']$/g, "").trim()
-          if (val) return val
+        if (trimmed && !trimmed.startsWith("#")) {
+          const eqIdx = trimmed.indexOf("=")
+          if (eqIdx !== -1) {
+            const k = trimmed.substring(0, eqIdx).trim()
+            const v = trimmed.substring(eqIdx + 1).replace(/^["']|["']$/g, "").trim()
+            if (k) cachedEnvFile[k] = v
+          }
         }
       }
     }
   } catch {
     // Ignore fallback errors
   }
-  return undefined
+  return cachedEnvFile
+}
+
+function resolveEnvKey(key: string): string | undefined {
+  if (process.env[key]) return process.env[key]
+  const envMap = getEnvFileMap()
+  return envMap[key]
 }
 
 export interface ModelOptions {

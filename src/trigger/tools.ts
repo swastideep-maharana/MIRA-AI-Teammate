@@ -294,76 +294,86 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
           return await withTimeout(
             (async () => {
               // 1. DuckDuckGo lite search
-              const ddgRes = await fetch("https://lite.duckduckgo.com/lite/", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded",
-                  "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                },
-                body: "q=" + encodeURIComponent(query),
-              })
+              try {
+                const ddgRes = await fetch("https://lite.duckduckgo.com/lite/", {
+                  method: "POST",
+                  signal: AbortSignal.timeout(6000),
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent":
+                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                  },
+                  body: "q=" + encodeURIComponent(query),
+                })
 
-              if (ddgRes.ok) {
-                const html = await ddgRes.text()
-                const rows = html.split("<tr>")
-                const results: Array<{ title: string; url: string; snippet: string }> = []
-                let currentLink: { url: string; title: string } | null = null
+                if (ddgRes.ok) {
+                  const html = await ddgRes.text()
+                  const rows = html.split("<tr>")
+                  const results: Array<{ title: string; url: string; snippet: string }> = []
+                  let currentLink: { url: string; title: string } | null = null
 
-                for (const row of rows) {
-                  const linkMatch =
-                    row.match(/<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i) ||
-                    row.match(/<a[^>]*href=['"]([^'"]+)['"][^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/i)
+                  for (const row of rows) {
+                    const linkMatch =
+                      row.match(/<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i) ||
+                      row.match(/<a[^>]*href=['"]([^'"]+)['"][^>]*class=['"]result-link['"][^>]*>([\s\S]*?)<\/a>/i)
 
-                  if (linkMatch) {
-                    currentLink = {
-                      url: linkMatch[1],
-                      title: decodeHtmlEntities(linkMatch[2]),
+                    if (linkMatch) {
+                      currentLink = {
+                        url: linkMatch[1],
+                        title: decodeHtmlEntities(linkMatch[2]),
+                      }
+                    }
+                    const snippetMatch = row.match(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i)
+                    if (snippetMatch && currentLink) {
+                      results.push({
+                        title: currentLink.title,
+                        url: currentLink.url,
+                        snippet: decodeHtmlEntities(snippetMatch[1]),
+                      })
+                      currentLink = null
                     }
                   }
-                  const snippetMatch = row.match(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i)
-                  if (snippetMatch && currentLink) {
-                    results.push({
-                      title: currentLink.title,
-                      url: currentLink.url,
-                      snippet: decodeHtmlEntities(snippetMatch[1]),
-                    })
-                    currentLink = null
-                  }
-                }
 
-                if (results.length > 0) {
-                  return {
-                    success: true,
-                    query,
-                    count: results.length,
-                    results: results.slice(0, 8),
+                  if (results.length > 0) {
+                    return {
+                      success: true,
+                      query,
+                      count: results.length,
+                      results: results.slice(0, 8),
+                    }
                   }
                 }
+              } catch {
+                // If DuckDuckGo times out or fails, gracefully proceed to Wikipedia fallback
               }
 
               // 2. Fallback to Wikipedia search API
-              const wikiRes = await fetch(
-                `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`,
-                {
-                  headers: {
-                    "User-Agent": "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
-                  },
+              try {
+                const wikiRes = await fetch(
+                  `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`,
+                  {
+                    signal: AbortSignal.timeout(6000),
+                    headers: {
+                      "User-Agent": "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
+                    },
+                  }
+                )
+                if (wikiRes.ok) {
+                  const data = await wikiRes.json()
+                  const wikiResults = (data?.query?.search || []).map((item: any) => ({
+                    title: item.title,
+                    url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, "_"))}`,
+                    snippet: decodeHtmlEntities(item.snippet || ""),
+                  }))
+                  return {
+                    success: true,
+                    query,
+                    count: wikiResults.length,
+                    results: wikiResults.slice(0, 8),
+                  }
                 }
-              )
-              if (wikiRes.ok) {
-                const data = await wikiRes.json()
-                const wikiResults = (data?.query?.search || []).map((item: any) => ({
-                  title: item.title,
-                  url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, "_"))}`,
-                  snippet: decodeHtmlEntities(item.snippet || ""),
-                }))
-                return {
-                  success: true,
-                  query,
-                  count: wikiResults.length,
-                  results: wikiResults.slice(0, 8),
-                }
+              } catch {
+                // Wikipedia API timed out or network error
               }
 
               return {
@@ -445,85 +455,87 @@ with urllib.request.urlopen(req) as resp:
               }> = []
               const seenUrls = new Set<string>()
 
-              // 1. Wikipedia PageImages API (Best for products, consoles, landmarks, topics)
-              try {
-                const wikiRes = await fetch(
+              // Parallel search across Wikipedia PageImages & Wikimedia Commons for minimal latency
+              const [wikiResult, commonsResult] = await Promise.allSettled([
+                fetch(
                   `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
                     query
                   )}&gsrlimit=6&prop=pageimages|info&piprop=thumbnail|original&pithumbsize=960&inprop=url&format=json`,
                   {
+                    signal: AbortSignal.timeout(6000),
                     headers: {
                       "User-Agent":
                         "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
                     },
                   }
-                )
-                if (wikiRes.ok) {
-                  const data = await wikiRes.json()
-                  const pages = Object.values(data?.query?.pages || {}) as any[]
-                  for (const page of pages) {
-                    const imgUrl =
-                      page.thumbnail?.source || page.original?.source
-                    if (imgUrl && !seenUrls.has(imgUrl)) {
-                      seenUrls.add(imgUrl)
-                      images.push({
-                        title: page.title || query,
-                        imageUrl: imgUrl,
-                        sourceUrl:
-                          page.fullurl ||
-                          `https://en.wikipedia.org/wiki/${encodeURIComponent(
-                            (page.title || query).replace(/ /g, "_")
-                          )}`,
-                        description: page.title,
-                      })
-                    }
-                  }
-                }
-              } catch {}
-
-              // 2. Wikimedia Commons Image Search (Direct photography / product renders)
-              try {
-                const commonsRes = await fetch(
+                ).then(async (res) => (res.ok ? res.json() : null)),
+                fetch(
                   `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
                     query
                   )}&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=960&format=json`,
                   {
+                    signal: AbortSignal.timeout(6000),
                     headers: {
                       "User-Agent":
                         "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
                     },
                   }
-                )
-                if (commonsRes.ok) {
-                  const data = await commonsRes.json()
-                  const pages = Object.values(data?.query?.pages || {}) as any[]
-                  for (const page of pages) {
-                    const info = page.imageinfo?.[0]
-                    const imgUrl = info?.thumburl || info?.url
-                    if (imgUrl && !seenUrls.has(imgUrl)) {
-                      if (
-                        imgUrl.endsWith(".svg.png") ||
-                        /\.(jpe?g|png|webp)/i.test(imgUrl)
-                      ) {
-                        seenUrls.add(imgUrl)
-                        const rawTitle = (page.title || "")
-                          .replace(/^File:/i, "")
-                          .replace(/\.[^.]+$/, "")
-                        images.push({
-                          title: rawTitle || query,
-                          imageUrl: imgUrl,
-                          sourceUrl:
-                            info?.descriptionurl ||
-                            `https://commons.wikimedia.org/wiki/${encodeURIComponent(
-                              page.title
-                            )}`,
-                          description: rawTitle,
-                        })
-                      }
+                ).then(async (res) => (res.ok ? res.json() : null)),
+              ])
+
+              // Process Wikipedia PageImages
+              if (wikiResult.status === "fulfilled" && wikiResult.value) {
+                const data = wikiResult.value
+                const pages = Object.values(data?.query?.pages || {}) as any[]
+                for (const page of pages) {
+                  const imgUrl =
+                    page.thumbnail?.source || page.original?.source
+                  if (imgUrl && !seenUrls.has(imgUrl)) {
+                    seenUrls.add(imgUrl)
+                    images.push({
+                      title: page.title || query,
+                      imageUrl: imgUrl,
+                      sourceUrl:
+                        page.fullurl ||
+                        `https://en.wikipedia.org/wiki/${encodeURIComponent(
+                          (page.title || query).replace(/ /g, "_")
+                        )}`,
+                      description: page.title,
+                    })
+                  }
+                }
+              }
+
+              // Process Wikimedia Commons results
+              if (commonsResult.status === "fulfilled" && commonsResult.value) {
+                const data = commonsResult.value
+                const pages = Object.values(data?.query?.pages || {}) as any[]
+                for (const page of pages) {
+                  const info = page.imageinfo?.[0]
+                  const imgUrl = info?.thumburl || info?.url
+                  if (imgUrl && !seenUrls.has(imgUrl)) {
+                    if (
+                      imgUrl.endsWith(".svg.png") ||
+                      /\.(jpe?g|png|webp)/i.test(imgUrl)
+                    ) {
+                      seenUrls.add(imgUrl)
+                      const rawTitle = (page.title || "")
+                        .replace(/^File:/i, "")
+                        .replace(/\.[^.]+$/, "")
+                      images.push({
+                        title: rawTitle || query,
+                        imageUrl: imgUrl,
+                        sourceUrl:
+                          info?.descriptionurl ||
+                          `https://commons.wikimedia.org/wiki/${encodeURIComponent(
+                            page.title
+                          )}`,
+                        description: rawTitle,
+                      })
                     }
                   }
                 }
-              } catch {}
+              }
 
               // 3. Fallback via sandbox python if no images found yet
               if (images.length === 0) {
@@ -615,6 +627,7 @@ with urllib.request.urlopen(req) as resp:
           return await withTimeout(
             (async () => {
               const res = await fetch(url, {
+                signal: AbortSignal.timeout(8000),
                 headers: {
                   "User-Agent":
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

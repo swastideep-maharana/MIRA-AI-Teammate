@@ -80,6 +80,8 @@ import {
   Command,
   ExternalLink,
   Cpu,
+  AlertCircle,
+  RotateCcw,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -260,10 +262,11 @@ function ChatView({
   transport: DefaultChatTransport<UIMessage>
   initialMessages: UIMessage[]
 }) {
-  const { messages, sendMessage, status, stop, error } = useChat({
+  const { messages, sendMessage, status, stop, error, regenerate, clearError } = useChat({
     id: chatId,
     messages: initialMessages,
     transport,
+    throttle: 40,
   })
 
   const selectedBot = bots.find((b) => b.id === selectedBotId) ?? bot
@@ -830,13 +833,41 @@ function ChatView({
           )}
 
           {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {error.message?.includes("Minified React error") ||
-              error.message?.includes("Server Components render") ||
-              error.message?.includes("digest")
-                ? "Could not establish a connection to the chat service. Please check your network and try again."
-                : error.message ||
-                  "An error occurred while generating the response. Please try again."}
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 my-2">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="size-4 shrink-0 text-destructive mt-0.5" strokeWidth={1.75} />
+                <span className="leading-snug">
+                  {error.message?.includes("Minified React error") ||
+                  error.message?.includes("Server Components render") ||
+                  error.message?.includes("digest")
+                    ? "Could not establish a connection to the chat service. Please check your network and try again."
+                    : error.message ||
+                      "An error occurred while generating the response. Please try again."}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                {typeof regenerate === "function" && (
+                  <button
+                    type="button"
+                    onClick={() => regenerate()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-lg border border-destructive/40 bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="size-3" strokeWidth={1.75} />
+                    Retry
+                  </button>
+                )}
+                {typeof clearError === "function" && (
+                  <button
+                    type="button"
+                    onClick={() => clearError()}
+                    className="p-1 rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/15 transition-colors cursor-pointer"
+                    title="Dismiss"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="size-3.5" strokeWidth={1.75} />
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </ConversationContent>

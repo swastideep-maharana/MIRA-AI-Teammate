@@ -3,19 +3,24 @@ import { auth } from "@clerk/nextjs/server"
 import { and, eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { db } from "@/db"
-import { chats, messages as messagesTable } from "@/db/schema"
+import { chats, messages as messagesTable, usageLedgers } from "@/db/schema"
 import { buildSystemPrompt, type ChatClientData } from "@/lib/chat-prompt"
-import { createDaytonaTools } from "@/src/trigger/tools"
+import { createDaytonaTools, withTimeout } from "@/src/trigger/tools"
+import { applySlidingWindowContext, prunePastScreenshots } from "@/src/trigger/chat"
 import { getDaytona } from "@/lib/daytona"
 import { getLanguageModel, getActiveModelInfo } from "@/lib/ai-model"
 
 export const maxDuration = 60
 
 export async function POST(req: Request) {
+  const requestStartTime = Date.now()
   try {
     const { userId } = await auth()
     if (!userId) {
-      return new Response("Unauthorized", { status: 401 })
+      return new Response(JSON.stringify({ error: "Unauthorized. Please sign in." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      })
     }
 
     const body = await req.json()
@@ -24,7 +29,10 @@ export async function POST(req: Request) {
     const clientData: ChatClientData | undefined = body.clientData
 
     if (!chatId) {
-      return new Response("Missing chatId", { status: 400 })
+      return new Response(JSON.stringify({ error: "Missing chatId" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
     }
 
     // Verify chat ownership
@@ -93,16 +101,24 @@ export async function POST(req: Request) {
       }
     }
 
-    // 1. Fetch persistent memory from Daytona sandbox if sandboxId is present
+    // 1. Fetch persistent memory from Daytona sandbox if sandboxId is present (timeout protected)
     let memoryContent = ""
     if (resolvedClientData.sandboxId) {
       try {
         const daytona = getDaytona()
-        const sandbox = await daytona.get(resolvedClientData.sandboxId)
-        if (sandbox) {
-          const buf = await sandbox.fs.downloadFile("MEMORY.md")
-          memoryContent = buf.toString("utf-8").trim()
-        }
+        const memoryPromise = (async () => {
+          const sandbox = await daytona.get(resolvedClientData.sandboxId!)
+          if (sandbox) {
+            const buf = await sandbox.fs.downloadFile("MEMORY.md")
+            return buf.toString("utf-8").trim()
+          }
+          return ""
+        })()
+        memoryContent = await withTimeout(
+          memoryPromise,
+          2500,
+          "Sandbox memory retrieval timed out"
+        ).catch(() => "")
       } catch {
         // Sandbox may still be starting or file not written yet
       }
@@ -126,6 +142,7 @@ export async function POST(req: Request) {
             // Ignore if directory exists
           }
 
+          const filesToUpload: Array<{ filename: string; buffer: Buffer; targetPath: string }> = []
           for (const m of incomingMessages) {
             if (m.role === "user" && m.parts) {
               for (const p of m.parts) {
@@ -137,17 +154,29 @@ export async function POST(req: Request) {
                     const base64Data = dataUrl.substring(base64Index + 8)
                     const fileBuffer = Buffer.from(base64Data, "base64")
                     const targetPath = `/workspace/uploads/${filename}`
-                    try {
-                      await sandbox.fs.uploadFile(fileBuffer, targetPath)
-                      uploadedFilePaths.push(targetPath)
-                      console.log(`[Multimodal Sync] Uploaded ${filename} (${fileBuffer.length} bytes) to ${targetPath}`)
-                    } catch (uploadErr) {
-                      console.warn(`[Multimodal Sync] Failed to upload ${filename}:`, uploadErr)
-                    }
+                    filesToUpload.push({ filename, buffer: fileBuffer, targetPath })
                   }
                 }
               }
             }
+          }
+
+          if (filesToUpload.length > 0) {
+            await Promise.allSettled(
+              filesToUpload.map(async (f) => {
+                try {
+                  await withTimeout(
+                    sandbox.fs.uploadFile(f.buffer, f.targetPath),
+                    4000,
+                    `Upload ${f.filename} timed out`
+                  )
+                  uploadedFilePaths.push(f.targetPath)
+                  console.log(`[Multimodal Sync] Uploaded ${f.filename} (${f.buffer.length} bytes) to ${f.targetPath}`)
+                } catch (uploadErr) {
+                  console.warn(`[Multimodal Sync] Warning uploading ${f.filename}:`, uploadErr)
+                }
+              })
+            )
           }
         }
       } catch (sandboxErr) {
@@ -171,10 +200,14 @@ ${
     // 3. Create Daytona tools
     const tools = createDaytonaTools(resolvedClientData)
 
-    // 4. Convert UIMessages to model messages
-    const modelMessages = await convertToModelMessages(incomingMessages, { tools })
+    // 4. Sliding window context truncation & ephemeral screenshot pruning for minimal TTFT
+    const windowedMessages = applySlidingWindowContext(incomingMessages)
+    const optimizedMessages = prunePastScreenshots(windowedMessages)
 
-    // 5. Stream response with Direct Multimodal Context (Gemini 3 Flash for files) or Groq
+    // 5. Convert UIMessages to model messages
+    const modelMessages = await convertToModelMessages(optimizedMessages, { tools })
+
+    // 6. Stream response with Direct Multimodal Context (Gemini 3 Flash for files) or Groq
     const activeModel = getActiveModelInfo({ hasAttachments })
     console.log(`Streaming chat using provider: ${activeModel.provider}, model: ${activeModel.model}`)
 
@@ -206,7 +239,40 @@ ${
         }
         return "An error occurred while streaming the AI response. Please try again."
       },
-      onFinish: async ({ responseMessage }) => {
+      onFinish: async ({ responseMessage, usage }: any) => {
+        // Meter token usage and sandbox compute duration into usage_ledgers
+        try {
+          const requestEndTime = Date.now()
+          const sandboxDurationSeconds = Math.max(1, Math.round((requestEndTime - requestStartTime) / 1000))
+          const promptTokens = usage?.promptTokens ?? usage?.inputTokens ?? 0
+          const completionTokens = usage?.completionTokens ?? usage?.outputTokens ?? 0
+          const totalTokens = usage?.totalTokens ?? (promptTokens + completionTokens)
+
+          const estimatedCostUsd = Number(
+            (
+              promptTokens * 0.00000015 +
+              completionTokens * 0.00000060 +
+              (resolvedClientData.sandboxId ? sandboxDurationSeconds * 0.00001 : 0)
+            ).toFixed(6)
+          )
+
+          await db.insert(usageLedgers).values({
+            userId,
+            botId: resolvedClientData.botId || null,
+            chatId,
+            promptTokens,
+            completionTokens,
+            totalTokens,
+            sandboxDurationSeconds: resolvedClientData.sandboxId ? sandboxDurationSeconds : 0,
+            estimatedCostUsd,
+          })
+          console.log(
+            `[UsageLedger] Chat turn metered: ${totalTokens} tokens, ${sandboxDurationSeconds}s sandbox, $${estimatedCostUsd}`
+          )
+        } catch (meterErr) {
+          console.warn("[UsageLedger] Warning persisting chat usage ledger:", meterErr)
+        }
+
         if (responseMessage) {
           const hasContent =
             responseMessage.parts &&
