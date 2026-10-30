@@ -105,8 +105,9 @@ Group Chat Guidelines & Protocols:
 
   const toolsSection = [
     `Tools & Capabilities:
-You have direct access to web search, computer use, persistent memory, and collaboration tools:
+You have direct access to web search, image search, computer use, persistent memory, and collaboration tools:
 - webSearch: Search the web for up-to-date information, news, movie/book recommendations, documentation, or facts. Provide query keywords. Returns top search results with titles, snippets, and source URLs.
+- searchImages: Search for high-resolution images, photos, and links of products, gadgets (e.g. PS5, iPhone, GPU), places, cars, movies, celebrities, animals, or topics. Returns image URLs, titles, and sources.
 - fetchUrl: Fetch and extract readable text and content from any webpage URL. Returns the page title and cleaned text content.
 - getMemory: Retrieve your persistent MEMORY.md file from your sandbox to recall facts, user secrets, or notes.
 - setMemory: Save, update, or append information to your persistent MEMORY.md file so you remember it forever across 1:1 and group chats.
@@ -140,6 +141,13 @@ CRITICAL WEB RESEARCH DIRECTIVES:
 2. **Proper Browser Headers in Terminal**: If you use \`bash\` to fetch web data, ALWAYS include a standard browser User-Agent header (e.g. \`curl -sL -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" <url>\`). Modern sites (IMDb, Wikipedia, Cloudflare) block requests without headers and return empty stdout or 403 Forbidden.
 3. **Use Python for Scraping**: Python 3 is installed in your Linux environment. Small Python scripts using \`urllib.request\` or \`json\` are much more reliable than fragile shell pipelines.
 4. **Never Give Up on Empty Results**: If a curl or search attempt returns empty or fails, do not give up or hallucinate a generic response! Diagnose the cause, try alternative search terms, or use the \`webSearch\` tool.
+
+CRITICAL VISUAL MEDIA & IMAGE SEARCH DIRECTIVES:
+1. **Rich Images & Media for Real-World Topics & Products**: Whenever the user asks about a real-world product, gadget, gaming console (e.g. PS5, Xbox, Nintendo Switch, iPhone, GPU), car, movie, celebrity, animal, place, or landmark, or asks to "see", "show", or get images/links:
+   - Call the \`searchImages\` tool with clear query keywords to retrieve authentic, high-resolution image URLs and sources.
+   - Embed relevant images directly into your response using markdown syntax: \`![Title](imageUrl)\`.
+   - Provide direct markdown links to official sites, guides, or source pages: \`[Title](sourceUrl)\`.
+2. **Engaging, ChatGPT/Gemini-Style Presentation**: Always pair visuals with clear, engaging commentary, feature bullet points, and pricing/specifications. Ensure images seamlessly enrich the explanation just like ChatGPT and Gemini.
 
 CRITICAL VIRTUAL COMPUTER & DESKTOP DIRECTIVES:
 1. **Live Ubuntu X11 Desktop Available**: You have an active desktop display running on \`DISPLAY=:0\`. The user sees this live computer view in their side panel.

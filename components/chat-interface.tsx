@@ -71,6 +71,8 @@ import {
   GlobeIcon,
   SearchIcon,
   PlusIcon,
+  ImageIcon,
+  ExternalLinkIcon,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -1021,6 +1023,11 @@ export function getToolDisplayInfo(toolName: string, input: any) {
         title: input?.query ? `Search web: "${input.query}"` : "Search web",
         icon: SearchIcon,
       }
+    case "searchImages":
+      return {
+        title: input?.query ? `Search images: "${input.query}"` : "Search images",
+        icon: ImageIcon,
+      }
     case "fetchUrl":
       return {
         title: input?.url
@@ -1314,7 +1321,54 @@ export function ToolPartView({
     )
   }
 
-  // 5. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
+  // 5. searchImages: specialized visual thumbnail gallery
+  if (toolName === "searchImages") {
+    const { title } = getToolDisplayInfo(toolName, part.input)
+    const images = (part.output as any)?.images || []
+    return (
+      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
+        <ToolHeader
+          title={title}
+          type={part.type as any}
+          state={part.state}
+          toolName={part.type === "dynamic-tool" ? part.toolName : undefined}
+        />
+        <ToolContent>
+          {images.length > 0 ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                {images.map((img: any, idx: number) => (
+                  <a
+                    key={idx}
+                    href={img.sourceUrl || img.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative block aspect-video overflow-hidden rounded-lg border border-border bg-muted/40 hover:border-cyan-500/50 transition-all shadow-2xs"
+                  >
+                    <img
+                      src={img.imageUrl}
+                      alt={img.title || "Image"}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5">
+                      <span className="block truncate text-[10px] font-medium text-white/90">
+                        {img.title}
+                      </span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <ToolOutput output={part.output} errorText={part.errorText} />
+          )}
+        </ToolContent>
+      </Tool>
+    )
+  }
+
+  // 6. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
   const { title } = getToolDisplayInfo(toolName, part.input)
   return (
     <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">

@@ -352,6 +352,180 @@ with urllib.request.urlopen(req) as resp:
       },
     }),
 
+    searchImages: tool({
+      description:
+        "Search for high-resolution images, photos, and links of products, gadgets (e.g. PS5, iPhone, GPU), places, cars, movies, celebrities, animals, or topics. Returns image URLs, titles, and sources. Always use this tool when the user asks about a subject or asks to see photos/images/links, so you can display them via markdown `![Title](imageUrl)` and `[Title](sourceUrl)`.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .min(1, "Query cannot be empty")
+          .max(500, "Query exceeds 500 characters")
+          .describe(
+            "Topic or product to search images for, e.g. 'PlayStation 5 console', 'Ferrari SF90', 'Eiffel Tower'"
+          ),
+      }),
+      execute: async ({ query }) => {
+        try {
+          return await withTimeout(
+            (async () => {
+              const images: Array<{
+                title: string
+                imageUrl: string
+                sourceUrl: string
+                description?: string
+              }> = []
+              const seenUrls = new Set<string>()
+
+              // 1. Wikipedia PageImages API (Best for products, consoles, landmarks, topics)
+              try {
+                const wikiRes = await fetch(
+                  `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+                    query
+                  )}&gsrlimit=6&prop=pageimages|info&piprop=thumbnail|original&pithumbsize=960&inprop=url&format=json`,
+                  {
+                    headers: {
+                      "User-Agent":
+                        "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
+                    },
+                  }
+                )
+                if (wikiRes.ok) {
+                  const data = await wikiRes.json()
+                  const pages = Object.values(data?.query?.pages || {}) as any[]
+                  for (const page of pages) {
+                    const imgUrl =
+                      page.thumbnail?.source || page.original?.source
+                    if (imgUrl && !seenUrls.has(imgUrl)) {
+                      seenUrls.add(imgUrl)
+                      images.push({
+                        title: page.title || query,
+                        imageUrl: imgUrl,
+                        sourceUrl:
+                          page.fullurl ||
+                          `https://en.wikipedia.org/wiki/${encodeURIComponent(
+                            (page.title || query).replace(/ /g, "_")
+                          )}`,
+                        description: page.title,
+                      })
+                    }
+                  }
+                }
+              } catch {}
+
+              // 2. Wikimedia Commons Image Search (Direct photography / product renders)
+              try {
+                const commonsRes = await fetch(
+                  `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+                    query
+                  )}&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=960&format=json`,
+                  {
+                    headers: {
+                      "User-Agent":
+                        "MiraAI/1.0 (https://mira.local; contact@mira.ai)",
+                    },
+                  }
+                )
+                if (commonsRes.ok) {
+                  const data = await commonsRes.json()
+                  const pages = Object.values(data?.query?.pages || {}) as any[]
+                  for (const page of pages) {
+                    const info = page.imageinfo?.[0]
+                    const imgUrl = info?.thumburl || info?.url
+                    if (imgUrl && !seenUrls.has(imgUrl)) {
+                      if (
+                        imgUrl.endsWith(".svg.png") ||
+                        /\.(jpe?g|png|webp)/i.test(imgUrl)
+                      ) {
+                        seenUrls.add(imgUrl)
+                        const rawTitle = (page.title || "")
+                          .replace(/^File:/i, "")
+                          .replace(/\.[^.]+$/, "")
+                        images.push({
+                          title: rawTitle || query,
+                          imageUrl: imgUrl,
+                          sourceUrl:
+                            info?.descriptionurl ||
+                            `https://commons.wikimedia.org/wiki/${encodeURIComponent(
+                              page.title
+                            )}`,
+                          description: rawTitle,
+                        })
+                      }
+                    }
+                  }
+                }
+              } catch {}
+
+              // 3. Fallback via sandbox python if no images found yet
+              if (images.length === 0) {
+                try {
+                  const sandbox = await getSandbox()
+                  const script = `python3 -c "
+import urllib.request, urllib.parse, json
+query = '''${query.replace(/'/g, "\\'")}'''
+url = 'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=' + urllib.parse.quote(query) + '&gsrlimit=5&prop=pageimages|info&piprop=thumbnail|original&pithumbsize=960&inprop=url&format=json'
+req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+with urllib.request.urlopen(req) as resp:
+    data = json.loads(resp.read().decode())
+    pages = list(data.get('query', {}).get('pages', {}).values())
+    results = []
+    for p in pages:
+        src = p.get('thumbnail', {}).get('source') or p.get('original', {}).get('source')
+        if src:
+            results.append({'title': p.get('title', query), 'imageUrl': src, 'sourceUrl': p.get('fullurl', '')})
+    print(json.dumps(results))
+"`
+                  const res = await withTimeout(
+                    sandbox.process.executeCommand(script),
+                    12000,
+                    "Sandbox image search fallback timed out."
+                  )
+                  if (res.exitCode === 0 && res.result) {
+                    const parsed = JSON.parse(res.result.trim())
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                      for (const item of parsed) {
+                        if (item.imageUrl && !seenUrls.has(item.imageUrl)) {
+                          seenUrls.add(item.imageUrl)
+                          images.push(item)
+                        }
+                      }
+                    }
+                  }
+                } catch {}
+              }
+
+              if (images.length > 0) {
+                return {
+                  success: true,
+                  query,
+                  count: images.length,
+                  images: images.slice(0, 6),
+                  instruction:
+                    "Embed these images in your response using markdown syntax: `![title](imageUrl)` and provide useful source links with `[title](sourceUrl)`.",
+                }
+              }
+
+              return {
+                success: true,
+                query,
+                count: 0,
+                images: [],
+                message: `No direct images found for '${query}'. Try broader search terms.`,
+              }
+            })(),
+            20000,
+            "Image search timed out after 20 seconds."
+          )
+        } catch (error: any) {
+          return createToolFailure(
+            "EXECUTION_ERROR",
+            error?.message || String(error),
+            "Retry with different search keywords."
+          )
+        }
+      },
+    }),
+
     fetchUrl: tool({
       description:
         "Fetch and extract readable text and content from any webpage URL. Returns the page title and cleaned text content.",

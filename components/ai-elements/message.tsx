@@ -17,7 +17,15 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, WrapTextIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  WrapTextIcon,
+  ExternalLinkIcon,
+  ImageIcon,
+} from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import * as React from "react";
 import {
@@ -486,6 +494,85 @@ function StreamdownTd({ children, className, ...props }: any) {
   );
 }
 
+function StreamdownImg({ src, alt, className, ...props }: any) {
+  const [hasError, setHasError] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div className="my-2.5 inline-flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2 text-xs text-muted-foreground">
+        <ImageIcon className="size-4 shrink-0 text-muted-foreground/70" />
+        <span className="truncate">{alt || "Image unavailable"}</span>
+      </div>
+    );
+  }
+
+  return (
+    <figure className="my-3.5 inline-block max-w-full rounded-2xl border border-border/80 bg-card/80 p-1.5 shadow-sm transition-all hover:border-cyan-500/40 hover:shadow-md group">
+      <div className="relative overflow-hidden rounded-xl bg-muted/40 max-h-[460px] flex items-center justify-center">
+        {!isLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/20 min-h-[160px] min-w-[200px]">
+            <ImageIcon className="size-6 text-muted-foreground/40 animate-pulse" />
+          </div>
+        )}
+        <img
+          src={src}
+          alt={alt || "Media image"}
+          loading="lazy"
+          decoding="async"
+          onError={() => setHasError(true)}
+          onLoad={() => setIsLoaded(true)}
+          className={cn(
+            "h-auto max-h-[460px] w-auto max-w-full object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.015]",
+            !isLoaded ? "opacity-0" : "opacity-100",
+            className
+          )}
+          {...props}
+        />
+      </div>
+      {alt && alt.trim() && (
+        <figcaption className="flex items-center justify-between gap-2 px-2.5 pt-2 pb-1 text-xs text-muted-foreground">
+          <span className="truncate font-medium text-foreground/90 text-[11px] sm:text-xs">
+            {alt}
+          </span>
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline shrink-0"
+            title="Open original image"
+          >
+            <span>Open</span>
+            <ExternalLinkIcon className="size-3" />
+          </a>
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+function StreamdownA({ href, children, className, ...props }: any) {
+  const isExternal =
+    href?.startsWith("http://") || href?.startsWith("https://");
+  return (
+    <a
+      href={href}
+      target={isExternal ? "_blank" : undefined}
+      rel={isExternal ? "noopener noreferrer" : undefined}
+      className={cn(
+        "inline-flex items-center gap-0.5 font-medium text-cyan-600 dark:text-cyan-400 underline decoration-cyan-500/40 underline-offset-3 hover:text-cyan-500 hover:decoration-cyan-500 transition-colors cursor-pointer",
+        className
+      )}
+      {...props}
+    >
+      <span>{children}</span>
+      {isExternal && (
+        <ExternalLinkIcon className="inline size-3 shrink-0 opacity-75 ml-0.5" />
+      )}
+    </a>
+  );
+}
+
 export const MessageResponse = memo(
   ({ className, components, ...props }: MessageResponseProps) => (
     <Streamdown
@@ -502,6 +589,8 @@ export const MessageResponse = memo(
         tr: StreamdownTr,
         th: StreamdownTh,
         td: StreamdownTd,
+        img: StreamdownImg,
+        a: StreamdownA,
         ...components,
       }}
       {...props}
