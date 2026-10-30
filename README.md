@@ -6,7 +6,7 @@ MIRA is a multi-agent AI collaboration platform built with Next.js, Trigger.dev,
 
 ## Overview
 
-MIRA gives each AI teammate a dedicated cloud environment (Daytona sandbox) with full computer use capabilities (GUI interaction, terminal execution, filesystem access). Teammates can collaborate in group chats, autonomously hand off tasks to specialists, and retain memories across both private and group interactions.
+MIRA gives each AI teammate a dedicated cloud environment (Daytona sandbox) with full computer use capabilities (GUI interaction, terminal execution, filesystem access). Teammates can collaborate in group chats, autonomously hand off tasks to specialists, retain memories across both private and group interactions, inspect multimodal documents, and search the web for visual references.
 
 ---
 
@@ -37,6 +37,7 @@ Each agent has direct access to tools executed within its sandbox:
 - keyboardPress: Send keyboard keys and hotkey combinations (such as Enter, Tab, Escape, Ctrl+C).
 - viewScreen: Capture screenshots internally for agent inspection (not rendered in chat).
 - showScreen: Capture and render screenshots directly into the user conversation.
+- searchImages: Query and retrieve relevant images from Wikimedia Commons and Wikipedia PageImages.
 
 ### 4. Cross-Chat Persistent Memory
 - Automatic initialization of a MEMORY.md file inside the bot's sandbox upon bot creation.
@@ -64,7 +65,48 @@ Each agent has direct access to tools executed within its sandbox:
 ### 7. Realtime Streaming Chat Experience
 - Powered by Trigger.dev AI Chat agents and the Vercel AI SDK.
 - Streaming responses with real-time thinking states, reasoning dropdowns, and execution inspection.
+- Thinking loader animation with pulsing avatar indicator and staggered glow dots during model deliberation.
+- Real-time typewriter streaming cursor effect on active assistant turns.
 - Rich markdown rendering using Streamdown with code syntax highlighting, CJK support, mathematical equations, and Mermaid diagrams.
+
+### 8. Multimodal Context Ingestion and Document Analysis
+- Direct multimodal ingestion leveraging Gemini 3 Flash native 1-million+ token context window, avoiding retrieval fragmentation and vector database chunking loss.
+- Attachment composer supporting PDF, plain text, Markdown, CSV, JSON, and source code files (.ts, .js, .py).
+- Dedicated attachment trigger button, selected file badge chips with removal controls, and inline file badge previews in user message streams.
+- Dual execution: Direct base64 inline multimodal parsing for Gemini alongside automated sandbox filesystem synchronization to `/workspace/uploads/`.
+
+### 9. Autonomous Image Search and Visual Rendering
+- searchImages tool integrated into the Trigger.dev agent loop, retrieving high-resolution images from Wikipedia PageImages and Wikimedia Commons.
+- Interactive image gallery cards in chat with responsive layouts, thumbnail previews, hover zoom inspection, and direct source attribution links.
+- Tool accordion stream preview showing live search progress and thumbnail previews during agent execution.
+
+### 10. Deterministic Tool Guardrails and Self-Correction Loop
+- Strict parameter boundary validation using Zod schemas across all agent tools.
+- Command filtering: Blacklisted destructive command patterns in bash (such as `rm -rf /`, fork bombs, and system directory mutations).
+- Execution timeout protection: 30-second execution timeout failsafe on shell operations with Promise-wrapped abort triggers.
+- Filesystem safety: Enforced file payload limits (2MB maximum) and directory path boundary checks.
+- Coordinate boundaries: Screen dimension validation (0 <= x <= 1920, 0 <= y <= 1080) for mouse interactions.
+- Structured error interception: Tool failures return standardized JSON responses (VALIDATION_ERROR, COMMAND_REJECTED, TIMEOUT) with correction hints, enabling Gemini 3 Flash to self-correct in subsequent turns rather than terminating task runners.
+
+### 11. Visual Context Optimization and Ephemeral Screenshot Pruning
+- Ephemeral visual history: Autonomous computer-use loops retain only the single most recent visual desktop screenshot in active LLM context.
+- Prior desktop frames are pruned in-memory to compact text markers (`[Screenshot taken: Desktop state at step N observed]`), preventing multi-megabyte context bloat during multi-turn automation.
+- High-resolution display captures (1920x1080) downscaled to 1024x768 JPEG via Sharp to minimize payload overhead.
+- Bidirectional coordinate normalization mapping so mouse clicks and movements accurately resolve to native display coordinates.
+
+### 12. Sliding Window Context Truncation
+- Context management for extended debugging and programming sessions.
+- Sessions exceeding 20 message turns automatically slide to preserve the initial system instructions and user task definition, condense intermediate turns into a rolling summary, and keep the latest 6 active turns intact.
+
+### 13. Multi-Tenant Usage Metering and Cost Ledger
+- Database-backed usage accounting via the `usage_ledgers` table in Neon PostgreSQL.
+- Per-turn recording of prompt tokens, completion tokens, total tokens, execution latency, and estimated USD compute costs.
+- Attributed to individual user, bot, and chat sessions for multi-tenant analytics and billing transparency.
+
+### 14. Sandbox Lifecycle Management
+- Auto-hibernation: Automatic transition of idle Daytona cloud sandboxes into suspended state after 15 minutes of inactivity to optimize cloud resources.
+- Wake-on-interaction: On-demand sandbox resumption whenever a user or agent initiates interaction.
+- Task crash cleanup hooks to terminate hanging background processes and reset runtime state.
 
 ---
 
@@ -93,6 +135,8 @@ Each agent has direct access to tools executed within its sandbox:
 - Clerk Next.js (Authentication and user management)
 - Trigger.dev v3 (Background agent execution, task scheduling, realtime chat streaming)
 - Daytona SDK (Cloud sandboxes, container lifecycle, remote desktop services)
+- Sharp (High-performance image processing and screenshot downscaling)
+- Tokenlens (Token and usage analytics)
 
 ### AI and LLM Integration
 - Vercel AI SDK (ai, @ai-sdk/react)
@@ -106,9 +150,10 @@ Each agent has direct access to tools executed within its sandbox:
 +--------------------------------------------------------------+
 |                       Next.js Client                         |
 |  - Chat Interface & Streamdown Markdown                      |
-|  - Multi-Agent Composer Selector                             |
+|  - Multi-Agent Composer Selector & File Attachments          |
 |  - Embedded noVNC Remote Desktop Panel                       |
 |  - Bot & Group Chat Dialogs                                  |
+|  - Thinking Loader & Interactive Image Galleries             |
 +------------------------------+-------------------------------+
                                |
                                | Server Actions / HTTP
@@ -116,8 +161,9 @@ Each agent has direct access to tools executed within its sandbox:
 +--------------------------------------------------------------+
 |                      Next.js Backend                         |
 |  - Clerk Authentication                                      |
-|  - Neon PostgreSQL (Chats, Bots, Chat Members)               |
+|  - Neon PostgreSQL (Chats, Bots, Chat Members, Usage Ledger) |
 |  - Trigger.dev Session Management & Token Minting            |
+|  - Sandbox Lifecycle Management (Auto-Hibernate & Wake)      |
 +------------------------------+-------------------------------+
                                |
                                | Trigger Task Dispatch
@@ -125,9 +171,11 @@ Each agent has direct access to tools executed within its sandbox:
 +--------------------------------------------------------------+
 |                  Trigger.dev Background Agent                |
 |  - chat-agent Task with Gemini 3 Flash                       |
-|  - Dynamic System Prompt Generation                          |
-|  - Persistent Memory Auto-Preload                            |
-|  - Handoff & Tool Routing                                    |
+|  - Dynamic System Prompt Generation & Memory Auto-Preload    |
+|  - Ephemeral Visual Pruning & Sliding Window Truncation      |
+|  - Tool Guardrails & Self-Correction Feedback Loop           |
+|  - Handoff & Tool Routing (Sandbox Tools + searchImages)     |
+|  - Usage & Cost Ledger Persistence                           |
 +------------------------------+-------------------------------+
                                |
                                | Daytona SDK / API
@@ -171,6 +219,21 @@ The database is managed with Drizzle ORM on Neon Serverless PostgreSQL:
 - botId: Foreign key referencing bots.id (cascade delete)
 - joinedAt: Timestamp
 
+### usage_ledgers
+- id: Primary key (text nanoid)
+- userId: Clerk user identifier
+- botId: Foreign key referencing bots.id (set null on delete)
+- chatId: Foreign key referencing chats.id (cascade delete)
+- promptTokens: Integer (count of input tokens consumed)
+- completionTokens: Integer (count of output tokens generated)
+- totalTokens: Integer (sum of prompt and completion tokens)
+- estimatedCostUsd: Numeric (estimated compute cost in USD)
+- durationMs: Integer (execution duration in milliseconds)
+- createdAt: Timestamp
+
+---
+
+## Getting Started
 
 ### Prerequisites
 - Node.js 20 or higher
@@ -180,3 +243,41 @@ The database is managed with Drizzle ORM on Neon Serverless PostgreSQL:
 - Trigger.dev v3 account and project
 - Clerk application keys
 - Google Gemini API key
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/mira.git
+   cd mira/Mira-ai-teammate
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure environment variables in `.env.local`:
+   ```env
+   DATABASE_URL="postgresql://..."
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_..."
+   CLERK_SECRET_KEY="sk_..."
+   TRIGGER_SECRET_KEY="tr_..."
+   NEXT_PUBLIC_TRIGGER_PUBLIC_API_KEY="pk_..."
+   DAYTONA_API_KEY="daytona_..."
+   DAYTONA_SERVER_URL="https://app.daytona.io/api"
+   DAYTONA_TARGET="us"
+   GOOGLE_GENERATIVE_AI_API_KEY="AIza..."
+   ```
+
+4. Push the database schema to Neon:
+   ```bash
+   npm run db:push
+   ```
+
+5. Start the development server and Trigger.dev agent runner:
+   ```bash
+   npm run dev
+   # In a separate terminal
+   npx trigger.dev@latest dev
+   ```
