@@ -175,6 +175,75 @@ export interface DaytonaToolContext {
   groupMembers?: BotTeammate[]
 }
 
+export const NATIVE_DISPLAY_WIDTH = 1920
+export const NATIVE_DISPLAY_HEIGHT = 1080
+export const OPTIMIZED_DISPLAY_WIDTH = 1024
+export const OPTIMIZED_DISPLAY_HEIGHT = 768
+
+/**
+ * Deterministic mapping utility to translate coordinates between downscaled/optimized
+ * frame dimensions (1024x768) and the native X11 display resolution (1920x1080).
+ */
+export function normalizeCoordinates(
+  x: number,
+  y: number,
+  sourceWidth = OPTIMIZED_DISPLAY_WIDTH,
+  sourceHeight = OPTIMIZED_DISPLAY_HEIGHT
+): { x: number; y: number } {
+  // If coordinates already exceed optimized dimensions, clamp to native 1920x1080
+  if (x > sourceWidth || y > sourceHeight) {
+    return {
+      x: Math.max(0, Math.min(NATIVE_DISPLAY_WIDTH, Math.round(x))),
+      y: Math.max(0, Math.min(NATIVE_DISPLAY_HEIGHT, Math.round(y))),
+    }
+  }
+  // Proportionally scale to native X11 coordinates
+  const mappedX = Math.round((x / sourceWidth) * NATIVE_DISPLAY_WIDTH)
+  const mappedY = Math.round((y / sourceHeight) * NATIVE_DISPLAY_HEIGHT)
+  return {
+    x: Math.max(0, Math.min(NATIVE_DISPLAY_WIDTH, mappedX)),
+    y: Math.max(0, Math.min(NATIVE_DISPLAY_HEIGHT, mappedY)),
+  }
+}
+
+/**
+ * Downscale full-resolution desktop screenshot (1920x1080) to 1024x768 and compress
+ * using JPEG to minimize payload size by up to 90%.
+ */
+export async function optimizeScreenshot(base64Png: string): Promise<{
+  screenshot: string
+  mediaType: string
+  width: number
+  height: number
+  sizeBytes: number
+}> {
+  try {
+    const sharp = (await import("sharp")).default
+    const inputBuffer = Buffer.from(base64Png, "base64")
+    const optimizedBuffer = await sharp(inputBuffer)
+      .resize(OPTIMIZED_DISPLAY_WIDTH, OPTIMIZED_DISPLAY_HEIGHT, { fit: "inside" })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toBuffer()
+
+    return {
+      screenshot: optimizedBuffer.toString("base64"),
+      mediaType: "image/jpeg",
+      width: OPTIMIZED_DISPLAY_WIDTH,
+      height: OPTIMIZED_DISPLAY_HEIGHT,
+      sizeBytes: optimizedBuffer.length,
+    }
+  } catch {
+    const buf = Buffer.from(base64Png, "base64")
+    return {
+      screenshot: base64Png,
+      mediaType: "image/png",
+      width: NATIVE_DISPLAY_WIDTH,
+      height: NATIVE_DISPLAY_HEIGHT,
+      sizeBytes: buf.length,
+    }
+  }
+}
+
 export function createDaytonaTools(context?: DaytonaToolContext) {
   const getSandbox = async () => {
     const sandboxId = context?.sandboxId
@@ -864,18 +933,22 @@ with urllib.request.urlopen(req) as resp:
           )
         }
 
+        const { x: targetX, y: targetY } = normalizeCoordinates(x, y)
+
         try {
           const sandbox = await getSandbox()
           await ensureComputerUse(sandbox)
           await withTimeout(
-            sandbox.computerUse.mouse.click(x, y, button, double),
+            sandbox.computerUse.mouse.click(targetX, targetY, button, double),
             15000,
             "Mouse click timed out after 15 seconds."
           )
           return {
             success: true,
-            x,
-            y,
+            x: targetX,
+            y: targetY,
+            originalX: x,
+            originalY: y,
             button,
             double,
           }
@@ -905,11 +978,13 @@ with urllib.request.urlopen(req) as resp:
           )
         }
 
+        const { x: targetX, y: targetY } = normalizeCoordinates(x, y)
+
         try {
           const sandbox = await getSandbox()
           await ensureComputerUse(sandbox)
           const res = await withTimeout(
-            sandbox.computerUse.mouse.move(x, y),
+            sandbox.computerUse.mouse.move(targetX, targetY),
             15000,
             "Mouse move timed out after 15 seconds."
           )
@@ -917,6 +992,8 @@ with urllib.request.urlopen(req) as resp:
             success: true,
             x: res.x,
             y: res.y,
+            originalX: x,
+            originalY: y,
           }
         } catch (error: any) {
           return createToolFailure(
@@ -954,18 +1031,22 @@ with urllib.request.urlopen(req) as resp:
           )
         }
 
+        const { x: targetX, y: targetY } = normalizeCoordinates(x, y)
+
         try {
           const sandbox = await getSandbox()
           await ensureComputerUse(sandbox)
           await withTimeout(
-            sandbox.computerUse.mouse.scroll(x, y, direction, amount),
+            sandbox.computerUse.mouse.scroll(targetX, targetY, direction, amount),
             15000,
             "Mouse scroll timed out after 15 seconds."
           )
           return {
             success: true,
-            x,
-            y,
+            x: targetX,
+            y: targetY,
+            originalX: x,
+            originalY: y,
             direction,
             amount,
           }
@@ -1089,10 +1170,17 @@ with urllib.request.urlopen(req) as resp:
             20000,
             "Screen capture timed out after 20 seconds."
           )
+          if (!res.screenshot) {
+            throw new Error("No screenshot data received from display capture.")
+          }
+          const optimized = await optimizeScreenshot(res.screenshot)
           return {
             success: true,
-            screenshot: res.screenshot,
-            sizeBytes: res.sizeBytes,
+            screenshot: optimized.screenshot,
+            mediaType: optimized.mediaType,
+            width: optimized.width,
+            height: optimized.height,
+            sizeBytes: optimized.sizeBytes,
           }
         } catch (error: any) {
           return createToolFailure(
@@ -1115,12 +1203,12 @@ with urllib.request.urlopen(req) as resp:
             value: [
               {
                 type: "file",
-                mediaType: "image/png",
+                mediaType: output.mediaType || "image/jpeg",
                 data: { type: "data", data: output.screenshot },
               },
               {
                 type: "text",
-                text: "Desktop screen screenshot captured. Inspect the screenshot image to see the active display and continue your task.",
+                text: "Desktop screen screenshot captured (optimized 1024x768). Inspect the active display and continue your task.",
               },
             ],
           }
@@ -1155,10 +1243,17 @@ with urllib.request.urlopen(req) as resp:
             20000,
             "Screen capture timed out after 20 seconds."
           )
+          if (!res.screenshot) {
+            throw new Error("No screenshot data received from display capture.")
+          }
+          const optimized = await optimizeScreenshot(res.screenshot)
           return {
             success: true,
-            screenshot: res.screenshot,
-            sizeBytes: res.sizeBytes,
+            screenshot: optimized.screenshot,
+            mediaType: optimized.mediaType,
+            width: optimized.width,
+            height: optimized.height,
+            sizeBytes: optimized.sizeBytes,
           }
         } catch (error: any) {
           return createToolFailure(

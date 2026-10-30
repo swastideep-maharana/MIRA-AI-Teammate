@@ -142,6 +142,8 @@ export async function startChatSession({
       trigger: "submit-message",
       message: userMessage as any,
       metadata: {
+        userId,
+        chatId,
         botId: targetBot?.id || clientData?.botId,
         botName: targetBot?.name || clientData?.botName,
         botJob: targetBot?.job || clientData?.botJob,

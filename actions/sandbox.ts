@@ -9,6 +9,101 @@ export interface SandboxVncUrlResult {
   error?: string
 }
 
+// In-memory tracker for sandbox last activity (VNC connection or tool use)
+const sandboxLastActivity = new Map<string, number>()
+const HIBERNATION_IDLE_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes
+
+export async function recordSandboxActivity(sandboxId: string): Promise<void> {
+  if (sandboxId) {
+    sandboxLastActivity.set(sandboxId, Date.now())
+  }
+}
+
+/**
+ * Stop / hibernate a sandbox if no activity or VNC connections have been detected for 15+ minutes.
+ * If force=true, stops the sandbox immediately (used for failure cleanup or session termination).
+ */
+export async function autoHibernateSandbox(
+  sandboxId: string,
+  force = false
+): Promise<{ hibernated: boolean; reason?: string }> {
+  try {
+    if (!sandboxId) return { hibernated: false, reason: "No sandboxId provided" }
+
+    const lastSeen = sandboxLastActivity.get(sandboxId) || 0
+    const idleDuration = Date.now() - lastSeen
+
+    if (!force && idleDuration < HIBERNATION_IDLE_TIMEOUT_MS) {
+      return {
+        hibernated: false,
+        reason: `Sandbox was active ${Math.round(idleDuration / 1000)}s ago (idle limit is 15m)`,
+      }
+    }
+
+    const sandbox = await daytona.get(sandboxId)
+    if (!sandbox) return { hibernated: false, reason: "Sandbox not found" }
+
+    if (sandbox.state === "started") {
+      try {
+        await sandbox.stop()
+        sandboxLastActivity.delete(sandboxId)
+        console.log(`[Lifecycle] Successfully hibernated idle sandbox ${sandboxId}`)
+        return { hibernated: true }
+      } catch (stopErr: any) {
+        console.warn(`[Lifecycle] Failed to stop sandbox ${sandboxId}:`, stopErr)
+        return { hibernated: false, reason: stopErr?.message || String(stopErr) }
+      }
+    }
+
+    return { hibernated: false, reason: `Sandbox is already ${sandbox.state}` }
+  } catch (error: any) {
+    console.warn(`[Lifecycle] Error in autoHibernateSandbox for ${sandboxId}:`, error)
+    return { hibernated: false, reason: error?.message || String(error) }
+  }
+}
+
+/**
+ * Wake-on-interaction fallback: if a user submits a prompt or connects to a hibernated bot,
+ * starts the sandbox asynchronously and ensures computer-use display services are ready.
+ */
+export async function ensureSandboxActive(
+  sandboxId: string
+): Promise<{ ready: boolean; state?: string; error?: string }> {
+  try {
+    if (!sandboxId) return { ready: false, error: "No sandboxId provided" }
+
+    recordSandboxActivity(sandboxId)
+    const sandbox = await daytona.get(sandboxId)
+    if (!sandbox) return { ready: false, error: "Sandbox not found" }
+
+    if (sandbox.state && sandbox.state !== "started") {
+      try {
+        await sandbox.start()
+        console.log(`[Lifecycle] Woke up hibernated sandbox ${sandboxId}`)
+      } catch (startErr: any) {
+        console.warn(`[Lifecycle] Could not start sandbox ${sandboxId}:`, startErr)
+        return { ready: false, error: startErr?.message || String(startErr) }
+      }
+    }
+
+    // Ensure computerUse stack is active
+    try {
+      const novncStatus = await sandbox.computerUse.getProcessStatus("novnc")
+      if (!novncStatus?.running) {
+        await sandbox.computerUse.start()
+      }
+    } catch {
+      try {
+        await sandbox.computerUse.start()
+      } catch {}
+    }
+
+    return { ready: true, state: "started" }
+  } catch (err: any) {
+    return { ready: false, error: err?.message || String(err) }
+  }
+}
+
 export async function getSandboxVncUrl(sandboxId: string): Promise<SandboxVncUrlResult> {
   try {
     const { userId } = await auth()
@@ -19,6 +114,8 @@ export async function getSandboxVncUrl(sandboxId: string): Promise<SandboxVncUrl
     if (!sandboxId) {
       return { error: "No sandboxId provided for this bot." }
     }
+
+    recordSandboxActivity(sandboxId)
 
     let timer: NodeJS.Timeout | undefined
     const timeoutPromise = new Promise<never>((_, reject) => {

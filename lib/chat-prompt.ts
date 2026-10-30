@@ -13,6 +13,8 @@ export const chatClientDataSchema = z.object({
   botJob: z.string().optional(),
   botInstructions: z.string().optional(),
   sandboxId: z.string().optional(),
+  userId: z.string().optional(),
+  chatId: z.string().optional(),
   isGroup: z.boolean().optional(),
   chatName: z.string().optional(),
   groupMembers: z.array(botMemberSchema).optional(),

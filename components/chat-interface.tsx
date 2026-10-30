@@ -876,6 +876,7 @@ function ChatView({
                 } as any,
                 {
                   metadata: {
+                    chatId,
                     botId: selectedBot?.id,
                     botName: selectedBot?.name,
                     botJob: selectedBot?.job,

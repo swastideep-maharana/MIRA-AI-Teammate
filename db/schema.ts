@@ -1,10 +1,12 @@
 import { relations } from "drizzle-orm";
 import {
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -83,19 +85,55 @@ export const messages = pgTable(
   (table) => [index("messages_chat_id_idx").on(table.chatId)],
 );
 
+export const usageLedgers = pgTable(
+  "usage_ledgers",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id").notNull(),
+    botId: text("bot_id").references(() => bots.id, { onDelete: "set null" }),
+    chatId: text("chat_id").references(() => chats.id, { onDelete: "cascade" }),
+    promptTokens: integer("prompt_tokens").notNull().default(0),
+    completionTokens: integer("completion_tokens").notNull().default(0),
+    totalTokens: integer("total_tokens").notNull().default(0),
+    sandboxDurationSeconds: integer("sandbox_duration_seconds").notNull().default(0),
+    estimatedCostUsd: real("estimated_cost_usd").default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("usage_ledgers_user_id_idx").on(table.userId),
+    index("usage_ledgers_chat_id_idx").on(table.chatId),
+    index("usage_ledgers_bot_id_idx").on(table.botId),
+  ],
+);
+
 export const botsRelations = relations(bots, ({ many }) => ({
   memberships: many(chatMembers),
+  usageLedgers: many(usageLedgers),
 }));
 
 export const chatsRelations = relations(chats, ({ many }) => ({
   members: many(chatMembers),
   messages: many(messages),
+  usageLedgers: many(usageLedgers),
 }));
 
 export const messagesRelations = relations(messages, ({ one }) => ({
   chat: one(chats, {
     fields: [messages.chatId],
     references: [chats.id],
+  }),
+}));
+
+export const usageLedgersRelations = relations(usageLedgers, ({ one }) => ({
+  chat: one(chats, {
+    fields: [usageLedgers.chatId],
+    references: [chats.id],
+  }),
+  bot: one(bots, {
+    fields: [usageLedgers.botId],
+    references: [bots.id],
   }),
 }));
 
@@ -130,3 +168,6 @@ export type Bot = typeof bots.$inferSelect;
 export type Chat = typeof chats.$inferSelect;
 export type ChatMember = typeof chatMembers.$inferSelect;
 export type DBMessage = typeof messages.$inferSelect;
+export type UsageLedger = typeof usageLedgers.$inferSelect;
+export type UsageLedgerInsert = typeof usageLedgers.$inferInsert;
+export const usageLedgerInsertSchema = createInsertSchema(usageLedgers);
