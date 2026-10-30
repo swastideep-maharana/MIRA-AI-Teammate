@@ -74,6 +74,13 @@ export const chatAgent = chat.agent({
           filename: att.name,
         }));
 
+        if (attachmentParts.length > 0 && existingParts.length === 0) {
+          existingParts.push({
+            type: "text",
+            text: "Please inspect, analyze, and summarize this attached document/file.",
+          });
+        }
+
         return {
           ...m,
           content: [...existingParts, ...attachmentParts],

@@ -70,6 +70,7 @@ import {
   XIcon,
   GlobeIcon,
   SearchIcon,
+  PlusIcon,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -266,6 +267,37 @@ function ChatView({
     Array<{ name: string; contentType: string; url: string; id: string }>
   >([])
 
+  const inferContentType = (fileName: string, rawType?: string): string => {
+    if (rawType && rawType !== "application/octet-stream" && rawType.trim()) return rawType
+    const ext = fileName.toLowerCase().split(".").pop() || ""
+    const mimeMap: Record<string, string> = {
+      pdf: "application/pdf",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      gif: "image/gif",
+      svg: "image/svg+xml",
+      txt: "text/plain",
+      md: "text/markdown",
+      markdown: "text/markdown",
+      csv: "text/csv",
+      json: "application/json",
+      js: "text/javascript",
+      ts: "text/typescript",
+      jsx: "text/javascript",
+      tsx: "text/typescript",
+      py: "text/x-python",
+      html: "text/html",
+      css: "text/css",
+      sh: "application/x-sh",
+      bash: "application/x-sh",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    return mimeMap[ext] || rawType || "application/octet-stream"
+  }
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files
     if (!selectedFiles || selectedFiles.length === 0) return
@@ -282,7 +314,7 @@ function ChatView({
           resolve({
             id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             name: file.name,
-            contentType: file.type || "application/octet-stream",
+            contentType: inferContentType(file.name, file.type),
             url: reader.result as string,
           })
         }
@@ -336,29 +368,53 @@ function ChatView({
       <Conversation className="flex-1 min-h-0 overflow-y-auto">
         <ConversationContent className="mx-auto w-full max-w-4xl lg:max-w-5xl py-6 px-4 sm:px-6 space-y-6">
           {uniqueMessages.length === 0 ? (
-            <ConversationEmptyState
-              icon={
-                isGroup ? (
+            <ConversationEmptyState>
+              <div className="flex flex-col items-center gap-4 max-w-md mx-auto py-8">
+                {isGroup ? (
                   <GroupChatAvatar
                     bots={bots}
-                    className="size-14 rounded-2xl mb-3 shadow-sm"
+                    className="size-16 rounded-2xl mb-1 shadow-md"
                   />
                 ) : (
                   <ChatAvatar
                     seed={botAvatar}
-                    className="size-12 rounded-xl mb-3 shadow-sm"
+                    className="size-14 rounded-2xl mb-1 shadow-md"
                   />
-                )
-              }
-              title={isGroup ? (chat?.name || "Group Chat") : `Talk with ${botName}`}
-              description={
-                isGroup
-                  ? `Featuring ${bots.map((b) => b.name).join(", ")}. Pick a bot below to chat!`
-                  : bot?.job
-                  ? `${bot.job} — Ready to help you with your work.`
-                  : "Send a message to start chatting."
-              }
-            />
+                )}
+                <div className="space-y-1.5 text-center">
+                  <h3 className="font-semibold text-base sm:text-lg text-foreground">
+                    {isGroup ? (chat?.name || "Group Chat") : `Talk with ${botName}`}
+                  </h3>
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed max-w-sm mx-auto">
+                    {isGroup
+                      ? `Featuring ${bots.map((b) => b.name).join(", ")}. Pick a bot below or attach a document to start.`
+                      : bot?.job
+                      ? `${bot.job} — Ready to help you with your work.`
+                      : "Send a message or attach a file to get started."}
+                  </p>
+                </div>
+
+                {/* Quick starter action cards like ChatGPT / Gemini */}
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
+                  >
+                    <FileTextIcon className="size-4 text-cyan-500 group-hover:scale-110 transition-transform" />
+                    <span>Attach PDF or Doc</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
+                  >
+                    <PlusIcon className="size-4 text-cyan-500 group-hover:scale-110 transition-transform" />
+                    <span>Upload File</span>
+                  </button>
+                </div>
+              </div>
+            </ConversationEmptyState>
           ) : (
             uniqueMessages.map((message, messageIndex) => {
               let msgBot: any = null
@@ -765,6 +821,13 @@ function ChatView({
               }
               if (trimmed) {
                 parts.push({ type: "text", text: trimmed })
+              } else if (allFiles.length > 0) {
+                parts.push({
+                  type: "text",
+                  text: `Please analyze and summarize the attached ${
+                    allFiles.length === 1 ? allFiles[0].filename : `${allFiles.length} files`
+                  }.`,
+                })
               }
 
               sendMessage(
@@ -855,23 +918,30 @@ function ChatView({
               />
             </PromptInputBody>
             <PromptInputFooter className="items-center">
-              <PromptInputTools>
+              <PromptInputTools className="flex items-center gap-2">
                 <input
                   type="file"
                   ref={fileInputRef}
                   className="hidden"
                   multiple
-                  accept=".pdf,.txt,.md,.csv,.json,.ts,.js,.py,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                  accept=".pdf,.txt,.md,.csv,.json,.ts,.js,.py,.doc,.docx,.png,.jpg,.jpeg,.webp,.sh"
                   onChange={handleFileChange}
                 />
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  title="Attach files (PDF, TXT, MD, CSV, JSON, TS, JS, PY)"
-                  className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
+                  title="Attach files (PDF, images, documents, code)"
+                  className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full border border-border/80 bg-secondary/80 hover:bg-secondary text-foreground hover:text-cyan-400 shadow-2xs transition-all cursor-pointer group active:scale-95"
                   aria-label="Attach files"
                 >
-                  <PaperclipIcon className="size-4" />
+                  <PlusIcon className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
+                  <PaperclipIcon className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
+                  <span className="text-xs font-medium">Attach</span>
+                  {localAttachments.length > 0 && (
+                    <span className="ml-0.5 inline-flex size-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-black">
+                      {localAttachments.length}
+                    </span>
+                  )}
                 </button>
                 {isGroup && bots.length > 1 && (
                   <PromptInputSelect
