@@ -49,11 +49,10 @@ export function buildSystemPrompt(
 
   sections.push(
     `### PERSISTENT BOT MEMORY (MEMORY.md):
-${
-  memoryContent && memoryContent.trim()
-    ? memoryContent.trim()
-    : "(Your MEMORY.md file is currently blank.)"
-}
+${memoryContent && memoryContent.trim()
+      ? memoryContent.trim()
+      : "(Your MEMORY.md file is currently blank.)"
+    }
 
 CRITICAL MEMORY DIRECTIVES:
 1. **Always Remember Important Information**: When the user tells you personal facts, secrets, passwords, project preferences, or explicitly says "remember this", you MUST immediately call the \`setMemory\` tool with \`mode: "append"\` to persist it in your sandbox \`MEMORY.md\`.
@@ -148,7 +147,18 @@ CRITICAL VIRTUAL COMPUTER & DESKTOP DIRECTIVES:
    - You can launch GUI applications via \`bash\` (e.g. \`DISPLAY=:0 google-chrome &\` or \`DISPLAY=:0 firefox &\`).
    - Call \`viewScreen\` to take a screenshot and see where windows, buttons, and text fields are located.
    - Use \`mouseClick\`, \`mouseMove\`, \`keyboardType\`, and \`keyboardPress\` to interact with the GUI.
-   - Call \`showScreen\` whenever the user asks to see what's on the screen in chat.`
+   - Call \`showScreen\` whenever the user asks to see what's on the screen in chat.
+
+CRITICAL TOOL GUARDRAILS & DETERMINISTIC SELF-CORRECTION LOOP:
+1. **Strict Guardrails & Parameter Boundaries**: All tools enforce deterministic boundaries:
+   - \`bash\`: Disallows destructive root deletion (rm -rf /), fork bombs, and altering OS authentication (/etc/passwd, /etc/shadow, /etc/sudoers). Strictly enforces a 30-second execution timeout.
+   - \`writeFile\`: Limits payload size to 2MB. Path traversal ('..') and writing to system directories (/etc, /boot, /usr) is blocked.
+   - \`mouseClick\` / \`mouseMove\`: Enforces screen boundary coordinates (0 <= x <= 1920, 0 <= y <= 1080).
+   - \`keyboardPress\`: Validates against standard keysyms, key names, or hotkey combos.
+2. **Self-Correction Feedback Loop**: If any tool call returns a failure with \`error_type\` ("VALIDATION_ERROR", "COMMAND_REJECTED", "TIMEOUT", "EXECUTION_ERROR"):
+   - Inspect the "details" and "instruction" provided in the tool output.
+   - Never give up, hallucinate that you completed it, or repeat the identical failing parameters.
+   - Immediately correct the parameter (e.g. adjust out-of-bounds coordinates, fix file paths, add non-interactive '-y' flags for package installs, or break large files) and retry the tool with corrected parameters in your next step.`
   );
 
   sections.push(toolsSection.join("\n"));

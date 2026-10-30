@@ -160,6 +160,7 @@ You can inspect, extract, or process these files directly using Python, grep, or
       messages: formattedMessages,
       tools,
       stopWhen: stepCountIs(15),
+      maxRetries: 2,
       abortSignal: signal,
     });
   },
