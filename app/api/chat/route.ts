@@ -108,8 +108,65 @@ export async function POST(req: Request) {
       }
     }
 
+    // Check if any incoming message contains file attachments
+    const hasAttachments = incomingMessages.some((m) =>
+      m.parts?.some((p) => p.type === "file")
+    )
+
+    // Synchronize uploaded files directly to Daytona Linux sandbox (/workspace/uploads/)
+    const uploadedFilePaths: string[] = []
+    if (resolvedClientData.sandboxId && hasAttachments) {
+      try {
+        const daytona = getDaytona()
+        const sandbox = await daytona.get(resolvedClientData.sandboxId)
+        if (sandbox) {
+          try {
+            await sandbox.process.executeCommand("mkdir -p /workspace/uploads")
+          } catch {
+            // Ignore if directory exists
+          }
+
+          for (const m of incomingMessages) {
+            if (m.role === "user" && m.parts) {
+              for (const p of m.parts) {
+                if (p.type === "file" && (p as any).url?.startsWith("data:")) {
+                  const dataUrl = (p as any).url as string
+                  const filename = (p as any).filename || `doc-${Date.now()}`
+                  const base64Index = dataUrl.indexOf(";base64,")
+                  if (base64Index !== -1) {
+                    const base64Data = dataUrl.substring(base64Index + 8)
+                    const fileBuffer = Buffer.from(base64Data, "base64")
+                    const targetPath = `/workspace/uploads/${filename}`
+                    try {
+                      await sandbox.fs.uploadFile(fileBuffer, targetPath)
+                      uploadedFilePaths.push(targetPath)
+                      console.log(`[Multimodal Sync] Uploaded ${filename} (${fileBuffer.length} bytes) to ${targetPath}`)
+                    } catch (uploadErr) {
+                      console.warn(`[Multimodal Sync] Failed to upload ${filename}:`, uploadErr)
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (sandboxErr) {
+        console.warn("[Multimodal Sync] Sandbox connection error:", sandboxErr)
+      }
+    }
+
     // 2. Build system prompt
-    const system = buildSystemPrompt(resolvedClientData, memoryContent)
+    let system = buildSystemPrompt(resolvedClientData, memoryContent)
+    if (hasAttachments) {
+      system += `\n\n### USER ATTACHED DOCUMENTS & MULTIMODAL CONTEXT:
+The user has attached documents/files to this conversation.
+You have direct multimodal context to read, parse, and analyze the entire document (tables, figures, exact text, page numbers) natively with zero loss.
+${
+  uploadedFilePaths.length > 0
+    ? `The uploaded file(s) have also been synchronized to your Linux container filesystem at:\n${uploadedFilePaths.map((p) => `- \`${p}\``).join("\n")}\nIf the user asks you to run Python/bash commands, scripts, or data extraction on these files, you can access them directly at these paths.`
+    : ""
+}`
+    }
 
     // 3. Create Daytona tools
     const tools = createDaytonaTools(resolvedClientData)
@@ -117,12 +174,12 @@ export async function POST(req: Request) {
     // 4. Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(incomingMessages, { tools })
 
-    // 5. Stream response with Groq (or Gemini fallback)
-    const activeModel = getActiveModelInfo()
+    // 5. Stream response with Direct Multimodal Context (Gemini 3 Flash for files) or Groq
+    const activeModel = getActiveModelInfo({ hasAttachments })
     console.log(`Streaming chat using provider: ${activeModel.provider}, model: ${activeModel.model}`)
 
     const result = streamText({
-      model: getLanguageModel(),
+      model: getLanguageModel({ hasAttachments }),
       system,
       messages: modelMessages,
       tools,

@@ -23,23 +23,49 @@ function resolveEnvKey(key: string): string | undefined {
   return undefined
 }
 
-export function getLanguageModel() {
+export interface ModelOptions {
+  hasAttachments?: boolean
+}
+
+export function getLanguageModel(options?: ModelOptions) {
+  // 1. Direct Multimodal Context (Gemini 3 Flash 1M+ Token Window):
+  // When files/documents (PDFs, docs, spreadsheets, images) are attached,
+  // route directly to Gemini 3 Flash for zero-retrieval-loss direct multimodal ingestion!
+  if (options?.hasAttachments) {
+    const modelName =
+      resolveEnvKey("AI_MULTIMODAL_MODEL") ||
+      process.env.AI_MULTIMODAL_MODEL ||
+      "gemini-3-flash-preview"
+    return google(modelName)
+  }
+
   const provider = (resolveEnvKey("AI_PROVIDER") || process.env.AI_PROVIDER || "groq").toLowerCase()
   const groqApiKey = resolveEnvKey("GROQ_API_KEY")
 
-  // 1. Default to Groq if GROQ_API_KEY is available (or AI_PROVIDER explicitly set to 'groq')
+  // 2. Default to Groq if GROQ_API_KEY is available (or AI_PROVIDER explicitly set to 'groq')
   if (provider === "groq" || (groqApiKey && provider !== "google")) {
     const modelName = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "openai/gpt-oss-120b"
     const groqInstance = groqApiKey ? createGroq({ apiKey: groqApiKey }) : groq
     return groqInstance(modelName)
   }
 
-  // 2. Google Gemini fallback (use gemini-3.8-flash for current API specifications)
-  const modelName = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "gemini-3.8-flash"
+  // 3. Google Gemini fallback
+  const modelName = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "gemini-3-flash-preview"
   return google(modelName)
 }
 
-export function getActiveModelInfo() {
+export function getActiveModelInfo(options?: ModelOptions) {
+  if (options?.hasAttachments) {
+    return {
+      provider: "google (direct multimodal context)",
+      model:
+        resolveEnvKey("AI_MULTIMODAL_MODEL") ||
+        process.env.AI_MULTIMODAL_MODEL ||
+        "gemini-3-flash-preview",
+      hasKey: Boolean(resolveEnvKey("GOOGLE_GENERATIVE_AI_API_KEY")),
+    }
+  }
+
   const provider = (resolveEnvKey("AI_PROVIDER") || process.env.AI_PROVIDER || "groq").toLowerCase()
   const groqApiKey = resolveEnvKey("GROQ_API_KEY")
 
@@ -52,7 +78,7 @@ export function getActiveModelInfo() {
   }
   return {
     provider: "google",
-    model: resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "gemini-3.8-flash",
+    model: resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "gemini-3-flash-preview",
     hasKey: Boolean(resolveEnvKey("GOOGLE_GENERATIVE_AI_API_KEY")),
   }
 }
