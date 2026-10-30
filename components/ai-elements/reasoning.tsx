@@ -11,7 +11,7 @@ import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
+import { BrainCircuit, ChevronDown } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -191,16 +191,17 @@ export const ReasoningTrigger = memo(
         {...props}
       >
         <div className="flex items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground border border-border">
-            <BrainIcon className={cn("size-3.5", isStreaming ? "text-cyan-500" : "text-muted-foreground")} />
+          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary/80 text-muted-foreground border border-border/80 shadow-2xs">
+            <BrainCircuit className={cn("size-3.5", isStreaming ? "text-cyan-400 animate-pulse" : "text-muted-foreground")} strokeWidth={1.75} />
           </div>
           {children ?? getThinkingMessage(isStreaming, duration)}
         </div>
-        <ChevronDownIcon
+        <ChevronDown
           className={cn(
             "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
             isOpen ? "rotate-180" : "rotate-0"
           )}
+          strokeWidth={1.75}
         />
       </CollapsibleTrigger>
     );

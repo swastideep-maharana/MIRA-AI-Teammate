@@ -53,27 +53,33 @@ import {
 } from "@/components/ai-elements/reasoning"
 import { VoiceDictation } from "@/components/voice-dictation"
 import {
-  TerminalIcon,
-  FileTextIcon,
-  FileCodeIcon,
-  FolderIcon,
-  MousePointerClickIcon,
-  MousePointerIcon,
-  ArrowUpDownIcon,
-  ArrowRightLeftIcon,
-  KeyboardIcon,
-  MonitorIcon,
-  DownloadIcon,
-  WrenchIcon,
-  BrainIcon,
-  PaperclipIcon,
-  FileIcon,
-  XIcon,
-  GlobeIcon,
-  SearchIcon,
-  PlusIcon,
-  ImageIcon,
-  ExternalLinkIcon,
+  Terminal as TerminalIcon,
+  FileText,
+  FileCode2,
+  FolderCode,
+  MousePointerClick,
+  MousePointer,
+  ArrowUpDown,
+  ArrowRightLeft,
+  Keyboard,
+  MonitorDot,
+  Monitor,
+  Download,
+  BrainCircuit,
+  Database,
+  Paperclip,
+  Paperclip as PaperclipIcon,
+  File,
+  X,
+  Globe,
+  Search,
+  Plus,
+  Image as ImageIcon,
+  Sparkles,
+  FileUp,
+  Command,
+  ExternalLink,
+  Cpu,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -196,9 +202,9 @@ function PromptAttachmentsPreview() {
                 className="size-4 rounded object-cover"
               />
             ) : isPdf ? (
-              <FileTextIcon className="size-3.5 text-rose-500 shrink-0" />
+              <FileText className="size-3.5 text-rose-500 shrink-0" strokeWidth={1.75} />
             ) : (
-              <FileIcon className="size-3.5 text-cyan-500 shrink-0" />
+              <File className="size-3.5 text-cyan-500 shrink-0" strokeWidth={1.75} />
             )}
             <span className="max-w-[150px] truncate text-xs font-medium">
               {file.filename || "file"}
@@ -210,7 +216,7 @@ function PromptAttachmentsPreview() {
               title="Remove attachment"
               aria-label="Remove attachment"
             >
-              <XIcon className="size-3" />
+              <X className="size-3" strokeWidth={1.75} />
             </button>
           </div>
         )
@@ -228,7 +234,7 @@ function PromptAttachButton() {
       className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
       aria-label="Attach file"
     >
-      <PaperclipIcon className="size-4" />
+      <Paperclip className="size-4" strokeWidth={1.75} />
     </PromptInputButton>
   )
 }
@@ -412,7 +418,7 @@ function ChatView({
                     onClick={() => fileInputRef.current?.click()}
                     className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
                   >
-                    <FileTextIcon className="size-4 text-cyan-500 group-hover:scale-110 transition-transform" />
+                    <FileUp className="size-4 text-cyan-400 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
                     <span>Attach Document</span>
                   </button>
                   <button
@@ -429,7 +435,7 @@ function ChatView({
                     }}
                     className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
                   >
-                    <ImageIcon className="size-4 text-cyan-500 group-hover:scale-110 transition-transform" />
+                    <Sparkles className="size-4 text-cyan-400 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
                     <span>Search Web Images</span>
                   </button>
                 </div>
@@ -587,11 +593,11 @@ function ChatView({
                               )}
                             >
                               {isPdf ? (
-                                <FileTextIcon className="size-4.5" />
+                                <FileText className="size-4.5" strokeWidth={1.75} />
                               ) : isCode ? (
-                                <FileCodeIcon className="size-4.5" />
+                                <FileCode2 className="size-4.5" strokeWidth={1.75} />
                               ) : (
-                                <FileIcon className="size-4.5" />
+                                <File className="size-4.5" strokeWidth={1.75} />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -609,7 +615,7 @@ function ChatView({
                                 className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
                                 title="Download attachment"
                               >
-                                <DownloadIcon className="size-3.5" />
+                                <Download className="size-3.5" strokeWidth={1.75} />
                               </a>
                             )}
                           </div>
@@ -657,9 +663,9 @@ function ChatView({
                                 )}
                               >
                                 {isPdf ? (
-                                  <FileTextIcon className="size-4.5" />
+                                  <FileText className="size-4.5" strokeWidth={1.75} />
                                 ) : (
-                                  <FileIcon className="size-4.5" />
+                                  <File className="size-4.5" strokeWidth={1.75} />
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -677,7 +683,7 @@ function ChatView({
                                   className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
                                   title="Download attachment"
                                 >
-                                  <DownloadIcon className="size-3.5" />
+                                  <Download className="size-3.5" strokeWidth={1.75} />
                                 </a>
                               )}
                             </div>
@@ -938,11 +944,11 @@ function ChatView({
                           className="size-4 rounded object-cover"
                         />
                       ) : isPdf ? (
-                        <FileTextIcon className="size-3.5 text-rose-500 shrink-0" />
+                        <FileText className="size-3.5 text-rose-500 shrink-0" strokeWidth={1.75} />
                       ) : isCode ? (
-                        <FileCodeIcon className="size-3.5 text-emerald-500 shrink-0" />
+                        <FileCode2 className="size-3.5 text-emerald-500 shrink-0" strokeWidth={1.75} />
                       ) : (
-                        <FileIcon className="size-3.5 text-cyan-500 shrink-0" />
+                        <File className="size-3.5 text-cyan-500 shrink-0" strokeWidth={1.75} />
                       )}
                       <span className="max-w-[140px] sm:max-w-[180px] truncate text-xs font-medium">
                         {att.name}
@@ -954,7 +960,7 @@ function ChatView({
                         title={`Remove ${att.name}`}
                         aria-label={`Remove ${att.name}`}
                       >
-                        <XIcon className="size-3" />
+                        <X className="size-3" strokeWidth={1.75} />
                       </button>
                     </div>
                   )
@@ -1079,74 +1085,74 @@ export function getToolDisplayInfo(toolName: string, input: any) {
     case "webSearch":
       return {
         title: input?.query ? `Search web: "${input.query}"` : "Search web",
-        icon: SearchIcon,
+        icon: Search,
       }
     case "searchImages":
       return {
         title: input?.query ? `Search images: "${input.query}"` : "Search images",
-        icon: ImageIcon,
+        icon: Sparkles,
       }
     case "fetchUrl":
       return {
         title: input?.url
           ? `Fetch web: ${input.url.length > 40 ? input.url.slice(0, 40) + "..." : input.url}`
           : "Fetch web page",
-        icon: GlobeIcon,
+        icon: Globe,
       }
     case "readFile":
       return {
         title: `Read ${input?.path || "file"}`,
-        icon: FileTextIcon,
+        icon: FileText,
       }
     case "writeFile":
       return {
         title: `Write ${input?.path || "file"}`,
-        icon: FileCodeIcon,
+        icon: FileCode2,
       }
     case "listFiles":
       return {
         title: `List files: ${input?.path || "."}`,
-        icon: FolderIcon,
+        icon: FolderCode,
       }
     case "mouseClick":
       return {
         title: `Mouse click (${input?.x ?? 0}, ${input?.y ?? 0})${input?.button ? ` [${input.button}]` : ""}${input?.double ? " (double)" : ""}`,
-        icon: MousePointerClickIcon,
+        icon: MousePointerClick,
       }
     case "mouseMove":
       return {
         title: `Mouse move to (${input?.x ?? 0}, ${input?.y ?? 0})`,
-        icon: MousePointerIcon,
+        icon: MousePointer,
       }
     case "mouseScroll":
       return {
         title: `Mouse scroll ${input?.direction || "down"} (${input?.amount || 1})`,
-        icon: ArrowUpDownIcon,
+        icon: ArrowUpDown,
       }
     case "keyboardType":
       return {
         title: `Type "${input?.text && input.text.length > 25 ? input.text.slice(0, 25) + "..." : input?.text || ""}"`,
-        icon: KeyboardIcon,
+        icon: Keyboard,
       }
     case "keyboardPress":
       return {
         title: `Press key ${input?.modifiers?.length ? input.modifiers.join("+") + "+" : ""}${input?.key || ""}`,
-        icon: KeyboardIcon,
+        icon: Command,
       }
     case "showScreen":
       return {
         title: "Desktop Screen",
-        icon: MonitorIcon,
+        icon: MonitorDot,
       }
     case "handoff":
       return {
         title: `Hand off to ${input?.targetBotName || "teammate"}`,
-        icon: ArrowRightLeftIcon,
+        icon: ArrowRightLeft,
       }
     case "getMemory":
       return {
         title: "Recall memory (MEMORY.md)",
-        icon: BrainIcon,
+        icon: BrainCircuit,
       }
     case "setMemory":
       return {
@@ -1154,12 +1160,12 @@ export function getToolDisplayInfo(toolName: string, input: any) {
           input?.mode === "replace"
             ? "Update memory (MEMORY.md)"
             : "Save to memory (MEMORY.md)",
-        icon: BrainIcon,
+        icon: Database,
       }
     default:
       return {
         title: toolName,
-        icon: WrenchIcon,
+        icon: Cpu,
       }
   }
 }
@@ -1201,7 +1207,7 @@ export function ToolPartView({
     if (isError) {
       return (
         <div className="my-2.5 flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-          <ArrowRightLeftIcon className="size-4 shrink-0" />
+          <ArrowRightLeft className="size-4 shrink-0" strokeWidth={1.75} />
           <span>
             Handoff error:{" "}
             {part.errorText || part.output?.error || "Failed to hand off"}
@@ -1220,7 +1226,7 @@ export function ToolPartView({
                 className="size-7 rounded-lg border border-background shadow-xs z-10"
               />
               <div className="flex size-6 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-500 border border-cyan-500/30 z-20 shadow-xs">
-                <ArrowRightLeftIcon className="size-3 animate-pulse" />
+                <ArrowRightLeft className="size-3 animate-pulse" strokeWidth={1.75} />
               </div>
               <ChatAvatar
                 seed={targetName}
@@ -1274,7 +1280,7 @@ export function ToolPartView({
         <div className="my-3 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
           <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3.5 py-2 text-xs font-medium text-muted-foreground select-none">
             <span className="flex items-center gap-2 text-foreground font-semibold">
-              <MonitorIcon className="size-4 text-cyan-500" />
+              <MonitorDot className="size-4 text-cyan-400" strokeWidth={1.75} />
               Desktop Screen
             </span>
             <div className="flex items-center gap-2">
@@ -1288,7 +1294,7 @@ export function ToolPartView({
                 download="desktop-screenshot.png"
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-muted transition-colors text-muted-foreground hover:text-foreground cursor-pointer"
               >
-                <DownloadIcon className="size-3.5" />
+                <Download className="size-3.5" strokeWidth={1.75} />
                 <span>Save</span>
               </a>
             </div>
@@ -1310,7 +1316,7 @@ export function ToolPartView({
     ) {
       return (
         <div className="my-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
-          <MonitorIcon className="size-4 shrink-0" />
+          <MonitorDot className="size-4 shrink-0" strokeWidth={1.75} />
           <span>
             Failed to capture screen:{" "}
             {part.errorText || part.output?.error || "Unknown error"}
@@ -1321,7 +1327,7 @@ export function ToolPartView({
 
     return (
       <div className="my-2.5 flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs text-muted-foreground animate-pulse">
-        <MonitorIcon className="size-4 text-cyan-500" />
+        <MonitorDot className="size-4 text-cyan-400" strokeWidth={1.75} />
         <span>Capturing desktop screen...</span>
       </div>
     )
@@ -1329,7 +1335,7 @@ export function ToolPartView({
 
   // 4. bash: specialized terminal output
   if (toolName === "bash") {
-    const { title } = getToolDisplayInfo(toolName, part.input)
+    const { title, icon } = getToolDisplayInfo(toolName, part.input)
     return (
       <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
         <ToolHeader
@@ -1337,6 +1343,7 @@ export function ToolPartView({
           type={part.type as any}
           state={part.state}
           toolName={part.type === "dynamic-tool" ? part.toolName : undefined}
+          icon={icon}
         />
         <ToolContent>
           {part.input?.command && (
@@ -1381,7 +1388,7 @@ export function ToolPartView({
 
   // 5. searchImages: specialized visual thumbnail gallery
   if (toolName === "searchImages") {
-    const { title } = getToolDisplayInfo(toolName, part.input)
+    const { title, icon } = getToolDisplayInfo(toolName, part.input)
     const images = (part.output as any)?.images || []
     return (
       <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
@@ -1390,6 +1397,7 @@ export function ToolPartView({
           type={part.type as any}
           state={part.state}
           toolName={part.type === "dynamic-tool" ? part.toolName : undefined}
+          icon={icon}
         />
         <ToolContent>
           {images.length > 0 ? (
@@ -1427,7 +1435,7 @@ export function ToolPartView({
   }
 
   // 6. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
-  const { title } = getToolDisplayInfo(toolName, part.input)
+  const { title, icon } = getToolDisplayInfo(toolName, part.input)
   return (
     <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-2.5">
       <ToolHeader
@@ -1435,6 +1443,7 @@ export function ToolPartView({
         type={part.type as any}
         state={part.state}
         toolName={part.type === "dynamic-tool" ? part.toolName : undefined}
+        icon={icon}
       />
       <ToolContent>
         {part.input && <ToolInput input={part.input} />}

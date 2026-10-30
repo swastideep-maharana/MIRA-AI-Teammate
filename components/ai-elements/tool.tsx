@@ -9,12 +9,12 @@ import {
 import { cn } from "@/lib/utils";
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import {
-  CheckCircleIcon,
-  ChevronDownIcon,
-  CircleIcon,
-  ClockIcon,
-  WrenchIcon,
-  XCircleIcon,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  Clock,
+  Cpu,
+  XCircle,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { isValidElement } from "react";
@@ -45,6 +45,7 @@ export type ToolPart = ToolUIPart | DynamicToolUIPart;
 export type ToolHeaderProps = {
   title?: string;
   className?: string;
+  icon?: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
 } & (
   | { type: ToolUIPart["type"]; state: ToolUIPart["state"]; toolName?: never }
   | {
@@ -85,7 +86,7 @@ export const getStatusBadge = (status: ToolPart["state"]) => {
         className="gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/25"
         variant="secondary"
       >
-        <XCircleIcon className="size-3 text-red-400" />
+        <XCircle className="size-3 text-red-400" strokeWidth={1.75} />
         {statusLabels[status]}
       </Badge>
     );
@@ -97,7 +98,7 @@ export const getStatusBadge = (status: ToolPart["state"]) => {
         className="gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground border border-border"
         variant="secondary"
       >
-        <CheckCircleIcon className="size-3 text-emerald-500" />
+        <CheckCircle2 className="size-3 text-emerald-500 dark:text-emerald-400" strokeWidth={1.75} />
         {statusLabels[status]}
       </Badge>
     );
@@ -108,7 +109,7 @@ export const getStatusBadge = (status: ToolPart["state"]) => {
       className="gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/25"
       variant="secondary"
     >
-      <ClockIcon className="size-3 text-amber-400" />
+      <Clock className="size-3 text-amber-400" strokeWidth={1.75} />
       {statusLabels[status]}
     </Badge>
   );
@@ -120,10 +121,13 @@ export const ToolHeader = ({
   type,
   state,
   toolName,
+  icon: CustomIcon,
   ...props
 }: ToolHeaderProps) => {
   const derivedName =
     type === "dynamic-tool" ? toolName : type.split("-").slice(1).join("-");
+
+  const IconComponent = CustomIcon ?? Cpu;
 
   return (
     <CollapsibleTrigger
@@ -134,15 +138,15 @@ export const ToolHeader = ({
       {...props}
     >
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground border border-border">
-          <WrenchIcon className="size-3.5 text-cyan-500" />
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary/80 text-muted-foreground border border-border/80 shadow-2xs">
+          <IconComponent className="size-3.5 text-cyan-500" strokeWidth={1.75} />
         </div>
         <span className="font-mono text-xs font-medium text-foreground truncate max-w-[280px] sm:max-w-[420px]">
           {title ?? derivedName}
         </span>
         {getStatusBadge(state)}
       </div>
-      <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+      <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" strokeWidth={1.75} />
     </CollapsibleTrigger>
   );
 };

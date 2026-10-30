@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Mic, MicOff, Square } from "lucide-react"
+import { AudioLines, Mic, MicOff, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/ui/toast"
 
@@ -216,27 +216,19 @@ export function VoiceDictation({
     >
       {isListening ? (
         <>
-          <span className="relative flex size-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-            <span className="relative inline-flex rounded-full size-2 bg-rose-500" />
-          </span>
-          <Square className="size-3 fill-current text-rose-500 shrink-0" />
+          <AudioLines className="size-3.5 text-rose-500 animate-pulse shrink-0" strokeWidth={2} />
           <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">
             Listening...
           </span>
-          {/* Animated sound bars */}
-          <span className="flex items-center gap-0.5 ml-0.5">
-            <span className="w-0.5 h-2.5 bg-rose-500 rounded-full animate-[pulse_0.6s_ease-in-out_infinite]" />
-            <span className="w-0.5 h-3.5 bg-rose-500 rounded-full animate-[pulse_0.4s_ease-in-out_infinite_0.1s]" />
-            <span className="w-0.5 h-2 bg-rose-500 rounded-full animate-[pulse_0.5s_ease-in-out_infinite_0.2s]" />
-          </span>
+          <Square className="size-2.5 fill-current text-rose-500 shrink-0 ml-0.5" />
         </>
       ) : (
         <>
-          <Mic className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors shrink-0" />
+          <Mic className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors shrink-0" strokeWidth={1.75} />
           <span className="text-xs font-medium">Dictate</span>
         </>
       )}
     </button>
   )
 }
+
