@@ -129,45 +129,44 @@ export function ChatHeader({
 
   return (
     <>
-      <header className="flex h-13 shrink-0 items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-3 sm:px-4 z-10 transition-colors">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {/* Accessible Mobile/Tablet Sidebar Drawer Trigger (only when sidebar is collapsed or on mobile) */}
-          {(isMobile || !open) && (
-            <SidebarTrigger className="-ml-1 mr-0.5 size-8 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors cursor-pointer rounded-lg" />
-          )}
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-3 sm:px-4 z-10 transition-colors">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Mobile-only Sidebar Drawer Trigger (on desktop, sidebar icon rail/expanded sidebar handles toggle with no duplicates) */}
+          <SidebarTrigger className="md:hidden -ml-1 size-8 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors cursor-pointer rounded-lg shrink-0" />
 
           {isGroup ? (
-            <Button
-              variant="ghost"
-              onClick={() => setEditDialogOpen(true)}
-              className="h-auto gap-2 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent/60 cursor-pointer rounded-lg truncate"
-            >
+            <div className="flex items-center gap-2 min-w-0">
               <GroupChatAvatar
                 bots={chat.members?.map((m) => m.bot)}
-                className="size-6 rounded-md shrink-0 shadow-xs"
+                className="size-8 rounded-xl shrink-0 shadow-xs border border-border/50"
               />
-              <span className="font-semibold text-foreground truncate">{name}</span>
-              <span className="text-xs text-muted-foreground font-mono">
-                ({chat.members?.length ?? 0})
-              </span>
-            </Button>
-          ) : bot ? (
-            <Button
-              variant="ghost"
-              onClick={() => setEditDialogOpen(true)}
-              className="h-auto gap-2 px-2 py-1 text-sm font-medium text-foreground hover:bg-accent/60 cursor-pointer rounded-lg truncate"
-            >
-              <ChatAvatar seed={avatarSeed} className="size-6 rounded-md shrink-0 shadow-xs" />
-              <span className="font-semibold text-foreground truncate">{name}</span>
-              {bot.job && (
-                <span className="text-xs text-muted-foreground hidden sm:inline-block font-mono">
-                  • {bot.job}
+              <div className="flex items-center gap-2 truncate">
+                <span className="font-semibold text-sm text-foreground truncate">{name}</span>
+                <span className="text-[11px] text-muted-foreground font-mono bg-muted/70 px-1.5 py-0.5 rounded-md border border-border/60 shrink-0">
+                  {chat.members?.length ?? 0} bots
                 </span>
-              )}
-            </Button>
+              </div>
+            </div>
+          ) : bot ? (
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="relative shrink-0">
+                <ChatAvatar seed={avatarSeed} className="size-8 rounded-xl shadow-xs border border-border/50" />
+                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-background" title="Online" />
+              </div>
+              <div className="flex flex-col min-w-0 text-left">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="font-semibold text-sm text-foreground truncate">{name}</span>
+                  {bot.job && (
+                    <span className="text-[11px] text-muted-foreground font-mono hidden sm:inline-block truncate">
+                      • {bot.job}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center gap-2 truncate">
-              <ChatAvatar seed={avatarSeed} className="size-6 rounded-md shrink-0 shadow-xs" />
+              <ChatAvatar seed={avatarSeed} className="size-8 rounded-xl shrink-0 shadow-xs border border-border/50" />
               <span className="text-sm font-semibold text-foreground truncate">{name}</span>
             </div>
           )}

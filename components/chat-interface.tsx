@@ -396,7 +396,7 @@ function ChatView({
                   </p>
                 </div>
 
-                {/* Quick starter action cards like ChatGPT / Gemini */}
+                {/* Quick starter action cards */}
                 <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
                   <button
                     type="button"
@@ -404,15 +404,24 @@ function ChatView({
                     className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
                   >
                     <FileTextIcon className="size-4 text-cyan-500 group-hover:scale-110 transition-transform" />
-                    <span>Attach PDF or Doc</span>
+                    <span>Attach Document</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      sendMessage({
+                        parts: [
+                          {
+                            type: "text",
+                            text: "Search for high-resolution images of modern AI computing clusters and summarize key specs.",
+                          },
+                        ],
+                      })
+                    }}
                     className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
                   >
-                    <PlusIcon className="size-4 text-cyan-500 group-hover:scale-110 transition-transform" />
-                    <span>Upload File</span>
+                    <ImageIcon className="size-4 text-cyan-500 group-hover:scale-110 transition-transform" />
+                    <span>Search Web Images</span>
                   </button>
                 </div>
               </div>
@@ -706,7 +715,7 @@ function ChatView({
                   <ChatAvatar
                     seed={msgBotAvatar}
                     alt={msgBotName}
-                    className="size-7 rounded-sm shrink-0 mt-1 shadow-xs"
+                    className="size-8 rounded-xl shrink-0 mt-0.5 shadow-xs border border-border/50"
                   />
                   <div className="flex-1 min-w-0 w-full flex flex-col">
                     {isGroup && (
@@ -967,10 +976,9 @@ function ChatView({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Attach files (PDF, images, documents, code)"
-                  className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full border border-border/80 bg-secondary/80 hover:bg-secondary text-foreground hover:text-cyan-400 shadow-2xs transition-all cursor-pointer group active:scale-95"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-border/80 bg-secondary/80 hover:bg-secondary text-foreground hover:text-cyan-400 shadow-2xs transition-all cursor-pointer group active:scale-95"
                   aria-label="Attach files"
                 >
-                  <PlusIcon className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
                   <PaperclipIcon className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
                   <span className="text-xs font-medium">Attach</span>
                   {localAttachments.length > 0 && (

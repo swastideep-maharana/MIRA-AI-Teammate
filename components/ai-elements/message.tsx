@@ -417,11 +417,11 @@ function StreamdownPre({ children, className, ...props }: any) {
 
 function StreamdownTable({ children, className, ...props }: any) {
   return (
-    <div className="my-3.5 w-full overflow-hidden rounded-xl border border-border bg-card/60 shadow-xs">
+    <div className="my-3 w-full overflow-hidden rounded-xl border border-border bg-card/70 shadow-xs">
       <div className="w-full overflow-x-auto scrollbar-thin">
         <table
           className={cn(
-            "w-full min-w-full border-collapse text-left text-xs divide-y divide-border/60",
+            "w-full min-w-full table-auto border-collapse text-left text-xs divide-y divide-border/60",
             className
           )}
           {...props}
@@ -436,7 +436,7 @@ function StreamdownTable({ children, className, ...props }: any) {
 function StreamdownThead({ children, className, ...props }: any) {
   return (
     <thead
-      className={cn("bg-muted/70 text-foreground font-semibold border-b border-border", className)}
+      className={cn("bg-muted/80 text-foreground font-semibold border-b border-border", className)}
       {...props}
     >
       {children}
@@ -448,7 +448,7 @@ function StreamdownTh({ children, className, ...props }: any) {
   return (
     <th
       className={cn(
-        "px-3.5 py-2.5 font-semibold text-xs text-foreground tracking-wide whitespace-normal align-middle select-none",
+        "px-4 py-2.5 font-semibold text-xs text-foreground tracking-wide whitespace-nowrap align-middle select-none",
         className
       )}
       {...props}
@@ -484,7 +484,7 @@ function StreamdownTd({ children, className, ...props }: any) {
   return (
     <td
       className={cn(
-        "px-3.5 py-2 text-xs text-foreground/90 align-top leading-relaxed break-words",
+        "px-4 py-2.5 text-xs text-foreground/90 align-top leading-relaxed break-words min-w-[120px]",
         className
       )}
       {...props}

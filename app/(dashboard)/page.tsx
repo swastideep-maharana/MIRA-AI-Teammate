@@ -30,7 +30,7 @@ export default async function Page() {
   return (
     <div className="flex flex-1 flex-col h-full min-h-svh bg-background text-foreground transition-colors">
       {/* Mobile top-bar with accessible drawer trigger */}
-      <div className="flex h-13 md:hidden items-center justify-between px-4 border-b border-border bg-background/80 backdrop-blur-md shrink-0">
+      <div className="flex h-14 md:hidden items-center justify-between px-4 border-b border-border bg-background/80 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-2.5">
           <SidebarTrigger className="-ml-1 size-8 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors cursor-pointer rounded-lg" />
           <div className="flex items-center gap-2">

@@ -37,7 +37,7 @@ export const TerminalHeader = ({
 }: TerminalHeaderProps) => (
   <div
     className={cn(
-      "flex items-center justify-between border-zinc-800 border-b px-4 py-2",
+      "flex items-center justify-between border-border/60 border-b px-3.5 py-1.5 text-xs select-none",
       className
     )}
     {...props}
@@ -204,7 +204,7 @@ export const TerminalContent = ({
   return (
     <div
       className={cn(
-        "max-h-96 overflow-auto p-4 font-mono text-sm leading-relaxed",
+        "max-h-80 overflow-auto p-3 sm:p-3.5 font-mono text-xs leading-relaxed scrollbar-thin",
         className
       )}
       ref={containerRef}
@@ -214,7 +214,7 @@ export const TerminalContent = ({
         <pre className="whitespace-pre-wrap break-words">
           <Ansi>{output}</Ansi>
           {isStreaming && (
-            <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-zinc-100" />
+            <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-cyan-400" />
           )}
         </pre>
       )}
@@ -247,7 +247,7 @@ export const Terminal = ({
     <TerminalContext.Provider value={contextValue}>
       <div
         className={cn(
-          "flex flex-col overflow-hidden rounded-lg border bg-zinc-950 text-zinc-100",
+          "flex flex-col overflow-hidden rounded-xl border border-border/80 bg-zinc-950 text-zinc-100 shadow-xs",
           className
         )}
         {...props}

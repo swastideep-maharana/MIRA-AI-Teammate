@@ -171,7 +171,7 @@ export function SandboxVncPreview({
       )}
     >
       {/* Sleek Daytona Control Bar */}
-      <div className="flex h-13 shrink-0 items-center justify-between gap-2 px-3 sm:px-4 bg-card/80 backdrop-blur-md border-b border-border z-10 transition-colors">
+      <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-3 sm:px-4 bg-card/80 backdrop-blur-md border-b border-border z-10 transition-colors">
         {/* Left: Connection Status Indicator */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-1.5 min-w-0">
