@@ -56,26 +56,27 @@ export function getLanguageModel(options?: ModelOptions) {
   const googleApiKey = resolveEnvKey("GOOGLE_GENERATIVE_AI_API_KEY") || process.env.GOOGLE_GENERATIVE_AI_API_KEY
   const groqApiKey = resolveEnvKey("GROQ_API_KEY") || process.env.GROQ_API_KEY
 
-  // 2. High-Capacity Google Gemini (4M TPM, 1M context window):
+  // 2. High-Capacity Google Gemini 3 Flash (4M TPM, 1M context window, frontier reasoning):
   // Default to Google Gemini whenever available, or when AI_PROVIDER is explicitly set to 'google'
   if (configuredProvider === "google" || (googleApiKey && configuredProvider !== "groq")) {
     const rawModel =
       resolveEnvKey("AI_MODEL") ||
       process.env.AI_MODEL ||
       "gemini-3-flash-preview"
-    // If the configured model name was a groq model (e.g. openai/gpt-oss-120b), safely fallback to gemini-3-flash-preview
-    const cleanModel = rawModel.includes("/") ? "gemini-3-flash-preview" : rawModel
+    // Disallow low-quality/limited gpt-oss models in favor of frontier Gemini 3 Flash
+    const cleanModel = rawModel.includes("gpt-oss") || rawModel.includes("/") ? "gemini-3-flash-preview" : rawModel
     return google(cleanModel)
   }
 
   // 3. Groq Provider fallback if explicitly configured
   if (configuredProvider === "groq" || groqApiKey) {
-    const modelName = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "openai/gpt-oss-120b"
+    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "qwen/qwen3.8-27b"
+    const modelName = rawModel.includes("gpt-oss") ? "qwen/qwen3.8-27b" : rawModel
     const groqInstance = groqApiKey ? createGroq({ apiKey: groqApiKey }) : groq
     return groqInstance(modelName)
   }
 
-  // 4. Fallback to Google Gemini
+  // 4. Fallback to Google Gemini 3 Flash
   return google("gemini-3-flash-preview")
 }
 
@@ -97,7 +98,7 @@ export function getActiveModelInfo(options?: ModelOptions) {
 
   if (configuredProvider === "google" || (googleApiKey && configuredProvider !== "groq")) {
     const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "gemini-3-flash-preview"
-    const model = rawModel.includes("/") ? "gemini-3-flash-preview" : rawModel
+    const model = rawModel.includes("gpt-oss") || rawModel.includes("/") ? "gemini-3-flash-preview" : rawModel
     return {
       provider: "google",
       model,
@@ -106,9 +107,11 @@ export function getActiveModelInfo(options?: ModelOptions) {
   }
 
   if (configuredProvider === "groq" || groqApiKey) {
+    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "qwen/qwen3.8-27b"
+    const model = rawModel.includes("gpt-oss") ? "qwen/qwen3.8-27b" : rawModel
     return {
       provider: "groq",
-      model: resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "openai/gpt-oss-120b",
+      model,
       hasKey: Boolean(groqApiKey),
     }
   }

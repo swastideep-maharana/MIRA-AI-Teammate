@@ -21,9 +21,16 @@ export function VoiceDictation({
   const [isListening, setIsListening] = React.useState(false)
   const [isSupported, setIsSupported] = React.useState(true)
   const recognitionRef = React.useRef<any>(null)
+  const isListeningRef = React.useRef(false)
   const isStoppingRef = React.useRef(false)
+  const onTranscriptRef = React.useRef(onTranscript)
 
-  // Initialize Web Speech API
+  // Keep onTranscript fresh without triggering re-initialization
+  React.useEffect(() => {
+    onTranscriptRef.current = onTranscript
+  }, [onTranscript])
+
+  // Initialize Web Speech API once per language
   React.useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -44,6 +51,7 @@ export function VoiceDictation({
 
       recognition.onstart = () => {
         setIsListening(true)
+        isListeningRef.current = true
         isStoppingRef.current = false
       }
 
@@ -52,26 +60,27 @@ export function VoiceDictation({
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalChunk += event.results[i][0].transcript
+            finalChunk += event.results[i][0].transcript + " "
           }
         }
 
         if (finalChunk.trim()) {
-          onTranscript(finalChunk.trim())
+          onTranscriptRef.current(finalChunk.trim())
         }
       }
 
       recognition.onerror = (event: any) => {
-        if (event.error === "no-speech") {
-          // Normal silence, don't show error
+        // Normal silence or browser abort, don't show noisy error
+        if (event.error === "no-speech" || event.error === "aborted") {
           return
         }
 
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           setIsListening(false)
+          isListeningRef.current = false
           toast.add({
             title: "Microphone access denied",
-            description: "Please allow microphone permissions in your browser settings to use voice dictation.",
+            description: "Please allow microphone permissions in your browser URL bar to use voice dictation.",
             type: "error",
           })
           return
@@ -79,28 +88,31 @@ export function VoiceDictation({
 
         if (event.error === "network") {
           setIsListening(false)
+          isListeningRef.current = false
           toast.add({
-            title: "Voice dictation network error",
-            description: "Speech recognition service could not be reached. Check your network connection.",
+            title: "Voice recognition network error",
+            description: "Speech recognition service could not be reached. Check your internet connection.",
             type: "error",
           })
           return
         }
 
         setIsListening(false)
+        isListeningRef.current = false
       }
 
       recognition.onend = () => {
-        if (!isStoppingRef.current && isListening) {
-          // Restart if it unexpectedly disconnected while still meant to listen
+        if (!isStoppingRef.current && isListeningRef.current) {
+          // Restart if it paused naturally while the user was still speaking
           try {
             recognition.start()
             return
           } catch {
-            // Fall through to stop
+            // Ignore
           }
         }
         setIsListening(false)
+        isListeningRef.current = false
       }
 
       recognitionRef.current = recognition
@@ -110,6 +122,7 @@ export function VoiceDictation({
 
     return () => {
       isStoppingRef.current = true
+      isListeningRef.current = false
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort()
@@ -118,7 +131,7 @@ export function VoiceDictation({
         }
       }
     }
-  }, [lang, onTranscript, isListening])
+  }, [lang])
 
   // Stop listening if Escape is pressed
   React.useEffect(() => {
@@ -135,20 +148,47 @@ export function VoiceDictation({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isListening])
 
-  const startListening = () => {
-    if (!recognitionRef.current || disabled) return
+  const startListening = async () => {
+    if (disabled) return
+
+    // Explicitly prompt for mic permission via getUserMedia if needed
+    try {
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        // Immediately stop tracks so recognition can use the hardware audio interface
+        stream.getTracks().forEach((track) => track.stop())
+      }
+    } catch (permErr: any) {
+      if (permErr?.name === "NotAllowedError" || permErr?.name === "PermissionDeniedError") {
+        toast.add({
+          title: "Microphone access blocked",
+          description: "Microphone permissions were denied. Please allow microphone access in your browser settings.",
+          type: "error",
+        })
+        return
+      }
+    }
+
+    if (!recognitionRef.current) return
     isStoppingRef.current = false
+    isListeningRef.current = true
     try {
       recognitionRef.current.start()
       setIsListening(true)
-    } catch {
-      // If already started, toggle off
-      stopListening()
+    } catch (err: any) {
+      if (err?.name === "InvalidStateError") {
+        // Already active
+        setIsListening(true)
+      } else {
+        setIsListening(false)
+        isListeningRef.current = false
+      }
     }
   }
 
   const stopListening = () => {
     isStoppingRef.current = true
+    isListeningRef.current = false
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop()
