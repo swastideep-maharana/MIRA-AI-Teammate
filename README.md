@@ -108,6 +108,12 @@ Each agent has direct access to tools executed within its sandbox:
 - Wake-on-interaction: On-demand sandbox resumption whenever a user or agent initiates interaction.
 - Task crash cleanup hooks to terminate hanging background processes and reset runtime state.
 
+### 15. Voice Dictation and Speech-to-Text
+- Native speech-to-text dictation integrated directly into the chat composer via the browser Web Speech API.
+- Live streaming transcription: Dictated speech is transcribed in real-time and appended directly into the active prompt textarea.
+- Visual recording states: Pulsing recording ring, live audio wave animation, and one-click toggle with Escape key abort support.
+- Permission error handling: Graceful detection and alerts for denied microphone access or unsupported browser runtimes.
+
 ---
 
 ## Technology Stack

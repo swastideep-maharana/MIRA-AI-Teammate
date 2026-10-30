@@ -51,6 +51,7 @@ import {
   ReasoningTrigger,
   ReasoningContent,
 } from "@/components/ai-elements/reasoning"
+import { VoiceDictation } from "@/components/voice-dictation"
 import {
   TerminalIcon,
   FileTextIcon,
@@ -265,9 +266,17 @@ function ChatView({
   const isGenerating = status === "submitted" || status === "streaming"
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [promptText, setPromptText] = React.useState("")
   const [localAttachments, setLocalAttachments] = React.useState<
     Array<{ name: string; contentType: string; url: string; id: string }>
   >([])
+
+  const handleVoiceTranscript = React.useCallback((transcript: string) => {
+    setPromptText((prev) => {
+      const trimmed = prev.trim()
+      return trimmed ? `${trimmed} ${transcript}` : transcript
+    })
+  }, [])
 
   const inferContentType = (fileName: string, rawType?: string): string => {
     if (rawType && rawType !== "application/octet-stream" && rawType.trim()) return rawType
@@ -837,7 +846,7 @@ function ChatView({
             multiple
             globalDrop
             onSubmit={({ text, files }) => {
-              const trimmed = text.trim()
+              const trimmed = (promptText || text || "").trim()
               const allFiles = [
                 ...localAttachments.map((a) => ({
                   filename: a.name,
@@ -903,6 +912,7 @@ function ChatView({
                   },
                 }
               )
+              setPromptText("")
               setLocalAttachments([])
             }}
           >
@@ -954,10 +964,12 @@ function ChatView({
             <PromptAttachmentsPreview />
             <PromptInputBody>
               <PromptInputTextarea
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
                 placeholder={
                   isGroup
-                    ? `Message ${selectedBot?.name ?? "group"}... (drop PDF or files)`
-                    : `Message ${botName}... (drop PDF or files)`
+                    ? `Message ${selectedBot?.name ?? "group"}... (drop files or dictate)`
+                    : `Message ${botName}... (drop files or dictate)`
                 }
                 className="min-h-12 max-h-48 resize-none font-sans text-sm placeholder:text-muted-foreground/70"
               />
@@ -987,6 +999,10 @@ function ChatView({
                     </span>
                   )}
                 </button>
+                <VoiceDictation
+                  onTranscript={handleVoiceTranscript}
+                  disabled={isGenerating}
+                />
                 {isGroup && bots.length > 1 && (
                   <PromptInputSelect
                     value={selectedBotId}
