@@ -76,6 +76,30 @@ function formatChatTime(date: Date | string) {
   }
 }
 
+function ChatTimestamp({ date }: { date: Date | string | null | undefined }) {
+  const [formatted, setFormatted] = React.useState<string>("")
+
+  React.useEffect(() => {
+    if (!date) return
+    setFormatted(formatChatTime(date))
+    const interval = setInterval(() => {
+      setFormatted(formatChatTime(date))
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [date])
+
+  if (!formatted) return null
+
+  return (
+    <span
+      suppressHydrationWarning
+      className="shrink-0 text-xs text-muted-foreground font-normal"
+    >
+      {formatted}
+    </span>
+  )
+}
+
 function SidebarUserButton() {
   const [mounted, setMounted] = React.useState(false)
 
@@ -262,7 +286,6 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
                   const isGroup = chat.kind === "group" || chat.members.length > 1
                   const bot = chat.members[0]?.bot
                   const name = chat.name || bot?.name || "Chat"
-                  const time = formatChatTime(chat.lastMessageAt)
                   const preview = chat.lastMessagesPreview
                   const isActive = pathname === `/chats/${chat.id}`
 
@@ -295,12 +318,7 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
                             <span className="truncate font-medium text-sm text-sidebar-foreground">
                               {name}
                             </span>
-                            <span
-                              suppressHydrationWarning
-                              className="shrink-0 text-xs text-muted-foreground font-normal"
-                            >
-                              {time}
-                            </span>
+                            <ChatTimestamp date={chat.lastMessageAt} />
                           </div>
                           {preview && (
                             <span className="truncate text-xs text-muted-foreground font-normal">

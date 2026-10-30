@@ -31,7 +31,7 @@ export const Tool = ({ className, state, ...props }: ToolProps) => {
   return (
     <Collapsible
       className={cn(
-        "group not-prose my-1.5 w-full max-w-2xl rounded-lg border border-border/70 bg-card/70 hover:bg-card/90 transition-all duration-150 overflow-hidden text-xs shadow-2xs",
+        "group not-prose my-1 w-full max-w-2xl rounded-md border border-border/60 bg-card/60 hover:bg-card/85 transition-all duration-150 overflow-hidden text-xs shadow-2xs",
         isRunning && "border-cyan-500/40 bg-cyan-500/5 ring-1 ring-cyan-500/20",
         className
       )}
@@ -71,10 +71,10 @@ export const getStatusBadge = (status: ToolPart["state"]) => {
   if (isExecuting) {
     return (
       <Badge
-        className="gap-1 rounded-full px-2 py-0 text-[10px] h-4.5 font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/25"
+        className="gap-1 rounded-full px-1.5 py-0 text-[9px] h-3.5 font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/25"
         variant="secondary"
       >
-        <span className="size-1.5 rounded-full bg-cyan-400 animate-ping" />
+        <span className="size-1 rounded-full bg-cyan-400 animate-ping" />
         {statusLabels[status]}
       </Badge>
     );
@@ -83,10 +83,10 @@ export const getStatusBadge = (status: ToolPart["state"]) => {
   if (status === "output-error" || status === "output-denied") {
     return (
       <Badge
-        className="gap-1 rounded-full px-2 py-0 text-[10px] h-4.5 font-medium bg-red-500/10 text-red-400 border border-red-500/25"
+        className="gap-1 rounded-full px-1.5 py-0 text-[9px] h-3.5 font-medium bg-red-500/10 text-red-400 border border-red-500/25"
         variant="secondary"
       >
-        <XCircle className="size-2.5 text-red-400" strokeWidth={1.75} />
+        <XCircle className="size-2 text-red-400" strokeWidth={1.75} />
         {statusLabels[status]}
       </Badge>
     );
@@ -95,10 +95,10 @@ export const getStatusBadge = (status: ToolPart["state"]) => {
   if (status === "output-available") {
     return (
       <Badge
-        className="gap-1 rounded-full px-2 py-0 text-[10px] h-4.5 font-medium bg-muted/60 text-muted-foreground border border-border/70"
+        className="gap-1 rounded-full px-1.5 py-0 text-[9px] h-3.5 font-medium bg-muted/60 text-muted-foreground border border-border/70"
         variant="secondary"
       >
-        <CheckCircle2 className="size-2.5 text-emerald-500 dark:text-emerald-400" strokeWidth={1.75} />
+        <CheckCircle2 className="size-2 text-emerald-500 dark:text-emerald-400" strokeWidth={1.75} />
         {statusLabels[status]}
       </Badge>
     );
@@ -106,10 +106,10 @@ export const getStatusBadge = (status: ToolPart["state"]) => {
 
   return (
     <Badge
-      className="gap-1 rounded-full px-2 py-0 text-[10px] h-4.5 font-medium bg-amber-500/10 text-amber-400 border border-amber-500/25"
+      className="gap-1 rounded-full px-1.5 py-0 text-[9px] h-3.5 font-medium bg-amber-500/10 text-amber-400 border border-amber-500/25"
       variant="secondary"
     >
-      <Clock className="size-2.5 text-amber-400" strokeWidth={1.75} />
+      <Clock className="size-2 text-amber-400" strokeWidth={1.75} />
       {statusLabels[status]}
     </Badge>
   );
@@ -132,21 +132,21 @@ export const ToolHeader = ({
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center justify-between gap-2.5 px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/40 cursor-pointer select-none",
+        "flex w-full items-center justify-between gap-2 px-2 py-1 text-xs transition-colors hover:bg-muted/40 cursor-pointer select-none",
         className
       )}
       {...props}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="flex size-5 shrink-0 items-center justify-center rounded bg-secondary/80 text-muted-foreground border border-border/70 shadow-2xs">
-          <IconComponent className="size-3 text-cyan-500" strokeWidth={1.75} />
+      <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex size-4.5 shrink-0 items-center justify-center rounded bg-secondary/80 text-muted-foreground border border-border/70 shadow-2xs">
+          <IconComponent className="size-2.5 text-cyan-500" strokeWidth={1.75} />
         </div>
-        <span className="font-mono text-[11px] font-medium text-foreground truncate max-w-[240px] sm:max-w-[420px]">
+        <span className="font-mono text-[10.5px] font-medium text-foreground truncate max-w-[240px] sm:max-w-[420px]">
           {title ?? derivedName}
         </span>
         {getStatusBadge(state)}
       </div>
-      <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" strokeWidth={1.75} />
+      <ChevronDown className="size-3 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" strokeWidth={1.75} />
     </CollapsibleTrigger>
   );
 };

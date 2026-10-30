@@ -224,7 +224,7 @@ ${
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(6),
-      maxRetries: 2,
+      maxRetries: 3,
     })
 
     return result.toUIMessageStreamResponse({
@@ -237,10 +237,10 @@ ${
         console.error("AI stream error in /api/chat:", err)
         if (err instanceof Error) {
           if (err.message.includes("quota") || err.message.includes("429") || err.message.includes("RESOURCE_EXHAUSTED")) {
-            return "API rate limit reached. Please wait a moment before sending another message."
+            return "AI model capacity reached. Automatic fallback was attempted, but all provider quotas are temporarily saturated. Please try again in a few seconds."
           }
           if (err.message.includes("tokens per minute") || err.message.includes("TPM") || err.message.includes("Request too large")) {
-            return "Rate limit (TPM) exceeded on model. The conversation context size was too large for this tier. Set AI_PROVIDER=google for 4M+ token capacity, or send a shorter prompt."
+            return "Rate limit (TPM) momentarily exceeded. Please wait a moment and try again."
           }
           if (err.message.includes("high demand") || err.message.includes("503")) {
             return "The AI service is temporarily experiencing high demand. Please try sending your message again."

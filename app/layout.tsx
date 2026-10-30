@@ -16,11 +16,15 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
+        url: "/favicon.ico",
+        sizes: "32x32",
+      },
+      {
         url: "/logo.svg",
         type: "image/svg+xml",
       },
     ],
-    shortcut: "/logo.svg",
+    shortcut: "/favicon.ico",
     apple: "/logo.svg",
   },
 }
@@ -43,34 +47,34 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn(geistSans.variable, geistMono.variable)}
+    <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      appearance={{
+        theme: shadcn,
+        options: {
+          unsafe_disableDevelopmentModeWarnings: true,
+        },
+      }}
     >
-      <body
+      <html
+        lang="en"
         suppressHydrationWarning
-        className="min-h-screen bg-background text-foreground font-sans antialiased"
+        className={cn(geistSans.variable, geistMono.variable)}
       >
-        <ClerkProvider
-          signInUrl="/sign-in"
-          signUpUrl="/sign-up"
-          signInFallbackRedirectUrl="/"
-          signUpFallbackRedirectUrl="/"
-          appearance={{
-            theme: shadcn,
-            options: {
-              unsafe_disableDevelopmentModeWarnings: true,
-            },
-          }}
+        <body
+          suppressHydrationWarning
+          className="min-h-screen bg-background text-foreground font-sans antialiased"
         >
           <ThemeProvider>
             <TooltipProvider>
               <Toaster>{children}</Toaster>
             </TooltipProvider>
           </ThemeProvider>
-        </ClerkProvider>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

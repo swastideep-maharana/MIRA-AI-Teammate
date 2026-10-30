@@ -137,7 +137,7 @@ export const Reasoning = memo(
       <ReasoningContext.Provider value={contextValue}>
         <Collapsible
           className={cn(
-            "not-prose my-2 w-full rounded-xl border border-border bg-card p-3 transition-all duration-200",
+            "not-prose my-1 w-full max-w-2xl rounded-md border border-border/60 bg-card/60 p-2 transition-all duration-150 text-xs",
             isStreaming && "border-cyan-500/35 bg-cyan-500/5 shadow-xs ring-1 ring-cyan-500/20 animate-pulse",
             className
           )}
@@ -161,16 +161,16 @@ export type ReasoningTriggerProps = ComponentProps<
 const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number) => {
   if (isStreaming || duration === 0) {
     return (
-      <span className="flex items-center gap-1.5 text-cyan-400 font-medium">
-        <span className="size-1.5 rounded-full bg-cyan-400 animate-ping" />
+      <span className="flex items-center gap-1.5 text-cyan-400 font-medium text-[11px]">
+        <span className="size-1 rounded-full bg-cyan-400 animate-ping" />
         Thinking & reasoning...
       </span>
     );
   }
   if (duration === undefined) {
-    return <span>Thought process</span>;
+    return <span className="text-[11px]">Thought process</span>;
   }
-  return <span>Thought for {duration}s</span>;
+  return <span className="text-[11px]">Thought for {duration}s</span>;
 };
 
 export const ReasoningTrigger = memo(
@@ -191,14 +191,14 @@ export const ReasoningTrigger = memo(
         {...props}
       >
         <div className="flex items-center gap-2">
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary/80 text-muted-foreground border border-border/80 shadow-2xs">
-            <BrainCircuit className={cn("size-3.5", isStreaming ? "text-cyan-400 animate-pulse" : "text-muted-foreground")} strokeWidth={1.75} />
+          <div className="flex size-4.5 shrink-0 items-center justify-center rounded bg-secondary/80 text-muted-foreground border border-border/80 shadow-2xs">
+            <BrainCircuit className={cn("size-3", isStreaming ? "text-cyan-400 animate-pulse" : "text-muted-foreground")} strokeWidth={1.75} />
           </div>
           {children ?? getThinkingMessage(isStreaming, duration)}
         </div>
         <ChevronDown
           className={cn(
-            "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+            "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
             isOpen ? "rotate-180" : "rotate-0"
           )}
           strokeWidth={1.75}
