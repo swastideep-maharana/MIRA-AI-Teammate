@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.105",
+    "@ai-sdk/groq": "^4.0.73",
     "@ai-sdk/react": "^4.0.157",
     "@base-ui/react": "^1.9.0",
     "@clerk/nextjs": "^7.9.14",

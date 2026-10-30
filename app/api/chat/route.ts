@@ -1,4 +1,3 @@
-import { google } from "@ai-sdk/google"
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai"
 import { auth } from "@clerk/nextjs/server"
 import { and, eq } from "drizzle-orm"
@@ -8,6 +7,7 @@ import { chats, messages as messagesTable } from "@/db/schema"
 import { buildSystemPrompt, type ChatClientData } from "@/lib/chat-prompt"
 import { createDaytonaTools } from "@/src/trigger/tools"
 import { getDaytona } from "@/lib/daytona"
+import { getLanguageModel, getActiveModelInfo } from "@/lib/ai-model"
 
 export const maxDuration = 60
 
@@ -117,15 +117,17 @@ export async function POST(req: Request) {
     // 4. Convert UIMessages to model messages
     const modelMessages = await convertToModelMessages(incomingMessages, { tools })
 
-    // 5. Stream response with Google Gemini (gemini-3-flash-preview: fast & stable free tier, or AI_MODEL env)
-    const aiModelName = process.env.AI_MODEL || "gemini-3-flash-preview"
+    // 5. Stream response with Groq (or Gemini fallback)
+    const activeModel = getActiveModelInfo()
+    console.log(`Streaming chat using provider: ${activeModel.provider}, model: ${activeModel.model}`)
+
     const result = streamText({
-      model: google(aiModelName),
+      model: getLanguageModel(),
       system,
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(15),
-      maxRetries: 1,
+      maxRetries: 2,
     })
 
     return result.toUIMessageStreamResponse({

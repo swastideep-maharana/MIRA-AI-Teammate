@@ -1,9 +1,9 @@
 import { chat } from "@trigger.dev/sdk/ai";
-import { google } from "@ai-sdk/google";
 import { stepCountIs } from "ai";
 import { z } from "zod";
 import { createDaytonaTools } from "./tools";
 import { getDaytona } from "../../lib/daytona";
+import { getLanguageModel } from "../../lib/ai-model";
 
 export const botMemberSchema = z.object({
   id: z.string(),
@@ -170,7 +170,7 @@ export const chatAgent = chat.agent({
     });
 
     return streamText({
-      model: google(process.env.AI_MODEL || "gemini-3-flash-preview"),
+      model: getLanguageModel(),
       system: buildSystemPrompt(clientData, memoryContent),
       messages,
       tools,
