@@ -297,17 +297,20 @@ ${
           }
 
           try {
-            await db.insert(messagesTable).values({
-              id: responseMessage.id || nanoid(),
-              chatId,
-              role: "assistant",
-              parts: responseMessage.parts as any,
-              metadata: {
-                botId: resolvedClientData.botId,
-                botName: resolvedClientData.botName,
-                botJob: resolvedClientData.botJob,
-              },
-            })
+            await db
+              .insert(messagesTable)
+              .values({
+                id: responseMessage.id || nanoid(),
+                chatId,
+                role: "assistant",
+                parts: responseMessage.parts as any,
+                metadata: {
+                  botId: resolvedClientData.botId,
+                  botName: resolvedClientData.botName,
+                  botJob: resolvedClientData.botJob,
+                },
+              })
+              .onConflictDoNothing()
 
             // Update chat last message preview
             let preview = "Active session"
@@ -315,6 +318,13 @@ ${
               if (part.type === "text" && part.text?.trim()) {
                 preview = part.text.trim().slice(0, 120)
                 break
+              } else if (
+                part.type === "tool-call" ||
+                (typeof part.type === "string" && part.type.startsWith("tool-")) ||
+                part.type === "dynamic-tool"
+              ) {
+                const toolName = (part as any).toolName || (part as any).name || "Tool"
+                preview = `Used ${toolName}`
               }
             }
 

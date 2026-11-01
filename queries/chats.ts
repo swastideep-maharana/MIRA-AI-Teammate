@@ -46,12 +46,15 @@ export async function getChatMessages(chatId: string): Promise<UIMessage[]> {
       orderBy: [asc(messages.createdAt)],
     })
 
-    return rows.map((row) => ({
-      id: row.id,
-      role: row.role as "user" | "assistant",
-      parts: (row.parts as any) || [],
-      metadata: (row.metadata as any) || undefined,
-    }))
+    return rows.map((row) => {
+      const parts = Array.isArray(row.parts) ? (row.parts as any) : []
+      return {
+        id: row.id,
+        role: row.role as "user" | "assistant",
+        parts,
+        metadata: (row.metadata as any) || undefined,
+      }
+    })
   } catch (error) {
     console.error(`Failed to fetch messages for chat ${chatId}:`, error)
     return []
