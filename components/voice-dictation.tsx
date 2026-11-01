@@ -265,7 +265,7 @@ export function VoiceDictation({
       ) : (
         <>
           <Mic className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors shrink-0" strokeWidth={1.75} />
-          <span className="text-xs font-medium">Dictate</span>
+          <span className="text-xs font-medium hidden sm:inline">Dictate</span>
         </>
       )}
     </button>

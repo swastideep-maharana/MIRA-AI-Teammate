@@ -82,6 +82,10 @@ import {
   Cpu,
   AlertCircle,
   RotateCcw,
+  ArrowUp,
+  ChevronDown,
+  Square,
+  CheckCircle2,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -180,49 +184,82 @@ export function ChatInterface({
   )
 }
 
+function AttachmentChip({
+  name,
+  contentType,
+  url,
+  onRemove,
+}: {
+  id?: string
+  name: string
+  contentType?: string
+  url?: string
+  onRemove: () => void
+}) {
+  const isPdf =
+    contentType === "application/pdf" || name.toLowerCase().endsWith(".pdf")
+  const isImage = contentType?.startsWith("image/")
+  const isCode = /\.(ts|js|py|json|csv|md|txt|sh)$/i.test(name)
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-border/80 bg-background/90 hover:bg-background px-2.5 py-1 text-xs text-foreground shadow-2xs group shrink-0 transition-all hover:border-cyan-500/50">
+      <div className="shrink-0">
+        {isImage && url ? (
+          <img
+            src={url}
+            alt={name}
+            className="size-5 rounded-md object-cover border border-border/60"
+          />
+        ) : isPdf ? (
+          <div className="flex size-5 items-center justify-center rounded-md bg-rose-500/15 text-rose-500 border border-rose-500/25">
+            <FileText className="size-3" strokeWidth={1.75} />
+          </div>
+        ) : isCode ? (
+          <div className="flex size-5 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+            <FileCode2 className="size-3" strokeWidth={1.75} />
+          </div>
+        ) : (
+          <div className="flex size-5 items-center justify-center rounded-md bg-cyan-500/15 text-cyan-500 border border-cyan-500/25">
+            <File className="size-3" strokeWidth={1.75} />
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col min-w-0">
+        <span className="max-w-[130px] sm:max-w-[180px] truncate text-xs font-semibold text-foreground">
+          {name}
+        </span>
+        <span className="text-[9px] text-muted-foreground uppercase font-mono tracking-wider">
+          {isPdf ? "PDF" : isImage ? "Image" : isCode ? "Code" : "File"}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-0.5 size-4 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+        title={`Remove ${name}`}
+        aria-label={`Remove ${name}`}
+      >
+        <X className="size-2.5" strokeWidth={2} />
+      </button>
+    </div>
+  )
+}
+
 function PromptAttachmentsPreview() {
   const attachments = usePromptInputAttachments()
   if (!attachments.files.length) return null
 
   return (
-    <div className="flex flex-wrap gap-2 px-3 pt-2.5 pb-1 border-b border-border/40 bg-muted/20">
-      {attachments.files.map((file) => {
-        const isPdf =
-          file.mediaType === "application/pdf" ||
-          file.filename?.toLowerCase().endsWith(".pdf")
-        const isImage = file.mediaType?.startsWith("image/")
-
-        return (
-          <div
-            key={file.id}
-            className="flex items-center gap-2 rounded-lg border border-border/80 bg-card px-2.5 py-1 text-xs text-foreground shadow-2xs group"
-          >
-            {isImage ? (
-              <img
-                src={file.url}
-                alt={file.filename || "Attachment"}
-                className="size-4 rounded object-cover"
-              />
-            ) : isPdf ? (
-              <FileText className="size-3.5 text-rose-500 shrink-0" strokeWidth={1.75} />
-            ) : (
-              <File className="size-3.5 text-cyan-500 shrink-0" strokeWidth={1.75} />
-            )}
-            <span className="max-w-[150px] truncate text-xs font-medium">
-              {file.filename || "file"}
-            </span>
-            <button
-              type="button"
-              onClick={() => attachments.remove(file.id)}
-              className="ml-0.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded p-0.5 transition-colors cursor-pointer"
-              title="Remove attachment"
-              aria-label="Remove attachment"
-            >
-              <X className="size-3" strokeWidth={1.75} />
-            </button>
-          </div>
-        )
-      })}
+    <div className="flex flex-wrap items-center gap-2 px-3 pt-2 pb-1.5 border-b border-border/40 bg-muted/20">
+      {attachments.files.map((file) => (
+        <AttachmentChip
+          key={file.id}
+          name={file.filename || "file"}
+          contentType={file.mediaType}
+          url={file.url}
+          onRemove={() => attachments.remove(file.id)}
+        />
+      ))}
     </div>
   )
 }
@@ -742,60 +779,82 @@ function ChatView({
                       </span>
                     )}
                     <div className="w-full text-foreground text-sm leading-relaxed space-y-3">
-                      {message.parts.map((part, index) => {
-                        if (part.type === "text") {
-                          if (!part.text?.trim()) return null
-                          const isLastMessage =
-                            messageIndex === uniqueMessages.length - 1
-                          const isLastPart = index === message.parts.length - 1
-                          const isStreamingThis = isLastMessage && isGenerating
+                      {(() => {
+                        const groupedParts = groupMessageParts(message.parts || [])
+                        let lastTextIdx = -1
+                        for (let k = groupedParts.length - 1; k >= 0; k--) {
+                          if (groupedParts[k].type === "text") {
+                            lastTextIdx = k
+                            break
+                          }
+                        }
 
-                          return (
-                            <div key={index} className="relative inline-block w-full">
-                              <MessageResponse
-                                mode={isStreamingThis ? "streaming" : "static"}
-                                isAnimating={isStreamingThis}
-                                animated={
-                                  isStreamingThis
-                                    ? { animation: "fadeIn", stagger: 20 }
-                                    : false
-                                }
-                                caret={isStreamingThis ? "block" : undefined}
+                        return groupedParts.map((item, itemIdx) => {
+                          if (item.type === "text") {
+                            if (!item.text?.trim()) return null
+                            const isLastMessage =
+                              messageIndex === uniqueMessages.length - 1
+                            const isLastPart = itemIdx === lastTextIdx
+                            const isStreamingThis = isLastMessage && isGenerating
+
+                            return (
+                              <div key={item.key} className="relative inline-block w-full">
+                                <MessageResponse
+                                  mode={isStreamingThis ? "streaming" : "static"}
+                                  isAnimating={isStreamingThis}
+                                  animated={
+                                    isStreamingThis
+                                      ? { animation: "fadeIn", stagger: 20 }
+                                      : false
+                                  }
+                                  caret={isStreamingThis ? "block" : undefined}
+                                >
+                                  {item.text}
+                                </MessageResponse>
+                                {isStreamingThis && isLastPart && (
+                                  <span className="animate-typing-cursor" />
+                                )}
+                              </div>
+                            )
+                          }
+
+                          if (item.type === "reasoning") {
+                            return (
+                              <Reasoning
+                                key={item.key}
+                                isStreaming={item.part.state === "streaming"}
                               >
-                                {part.text}
-                              </MessageResponse>
-                              {isStreamingThis && isLastPart && (
-                                <span className="animate-typing-cursor" />
-                              )}
-                            </div>
-                          )
-                        }
+                                <ReasoningTrigger />
+                                <ReasoningContent>{item.part.text}</ReasoningContent>
+                              </Reasoning>
+                            )
+                          }
 
-                        if (part.type === "reasoning") {
-                          return (
-                            <Reasoning
-                              key={index}
-                              isStreaming={part.state === "streaming"}
-                            >
-                              <ReasoningTrigger />
-                              <ReasoningContent>{part.text}</ReasoningContent>
-                            </Reasoning>
-                          )
-                        }
+                          if (item.type === "showScreen" || item.type === "handoff") {
+                            return (
+                              <ToolPartView
+                                key={item.key}
+                                part={item.part}
+                                sourceBot={msgBot}
+                                onSelectBot={onSelectBot}
+                              />
+                            )
+                          }
 
-                        if (isToolUIPart(part)) {
-                          return (
-                            <ToolPartView
-                              key={index}
-                              part={part}
-                              sourceBot={msgBot}
-                              onSelectBot={onSelectBot}
-                            />
-                          )
-                        }
+                          if (item.type === "toolGroup") {
+                            return (
+                              <ToolGroupView
+                                key={item.key}
+                                parts={item.parts}
+                                sourceBot={msgBot}
+                                onSelectBot={onSelectBot}
+                              />
+                            )
+                          }
 
-                        return null
-                      })}
+                          return null
+                        })
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -881,7 +940,7 @@ function ChatView({
       <div className="border-t border-border bg-background/95 backdrop-blur-md p-3 sm:p-4 shrink-0">
         <div className="mx-auto w-full max-w-4xl lg:max-w-5xl">
           <PromptInput
-            className="rounded-xl border border-border bg-card shadow-md focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30 transition-all overflow-hidden"
+            className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/95 dark:bg-card/90 shadow-xl shadow-black/10 dark:shadow-black/40 backdrop-blur-xl focus-within:border-cyan-500/60 focus-within:ring-2 focus-within:ring-cyan-500/20 transition-all duration-200 overflow-hidden"
             accept=".pdf,.doc,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.webp"
             multiple
             globalDrop
@@ -959,46 +1018,16 @@ function ChatView({
             {/* Display local uploaded attachments chips with remove button */}
             {localAttachments.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 px-3 pt-2.5 pb-2 border-b border-border/40 bg-muted/20 max-h-32 overflow-y-auto scrollbar-thin">
-                {localAttachments.map((att) => {
-                  const isPdf =
-                    att.contentType === "application/pdf" ||
-                    att.name.toLowerCase().endsWith(".pdf")
-                  const isImage = att.contentType.startsWith("image/")
-                  const isCode = /\.(ts|js|py|json|csv|md|txt)$/i.test(att.name)
-
-                  return (
-                    <div
-                      key={att.id}
-                      className="flex items-center gap-2 rounded-lg border border-border/80 bg-card px-2.5 py-1 text-xs text-foreground shadow-2xs group shrink-0"
-                    >
-                      {isImage ? (
-                        <img
-                          src={att.url}
-                          alt={att.name}
-                          className="size-4 rounded object-cover"
-                        />
-                      ) : isPdf ? (
-                        <FileText className="size-3.5 text-rose-500 shrink-0" strokeWidth={1.75} />
-                      ) : isCode ? (
-                        <FileCode2 className="size-3.5 text-emerald-500 shrink-0" strokeWidth={1.75} />
-                      ) : (
-                        <File className="size-3.5 text-cyan-500 shrink-0" strokeWidth={1.75} />
-                      )}
-                      <span className="max-w-[140px] sm:max-w-[180px] truncate text-xs font-medium">
-                        {att.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAttachment(att.id)}
-                        className="ml-0.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded p-0.5 transition-colors cursor-pointer"
-                        title={`Remove ${att.name}`}
-                        aria-label={`Remove ${att.name}`}
-                      >
-                        <X className="size-3" strokeWidth={1.75} />
-                      </button>
-                    </div>
-                  )
-                })}
+                {localAttachments.map((att) => (
+                  <AttachmentChip
+                    key={att.id}
+                    id={att.id}
+                    name={att.name}
+                    contentType={att.contentType}
+                    url={att.url}
+                    onRemove={() => handleRemoveAttachment(att.id)}
+                  />
+                ))}
               </div>
             )}
             <PromptAttachmentsPreview />
@@ -1011,10 +1040,10 @@ function ChatView({
                     ? `Message ${selectedBot?.name ?? "group"}... (drop files or dictate)`
                     : `Message ${botName}... (drop files or dictate)`
                 }
-                className="min-h-12 max-h-48 resize-none font-sans text-sm placeholder:text-muted-foreground/70"
+                className="min-h-[50px] max-h-48 resize-none font-sans text-sm sm:text-base leading-relaxed px-4 py-3 placeholder:text-muted-foreground/50 border-0 bg-transparent focus:outline-none focus:ring-0"
               />
             </PromptInputBody>
-            <PromptInputFooter className="items-center">
+            <PromptInputFooter className="items-center px-3 pb-2.5 pt-1 justify-between">
               <PromptInputTools className="flex items-center gap-2">
                 <input
                   type="file"
@@ -1028,13 +1057,12 @@ function ChatView({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Attach files (PDF, images, documents, code)"
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-border/80 bg-secondary/80 hover:bg-secondary text-foreground hover:text-cyan-400 shadow-2xs transition-all cursor-pointer group active:scale-95"
+                  className="relative inline-flex items-center justify-center size-8 sm:size-9 rounded-full border border-border/80 bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer group active:scale-95 shadow-2xs"
                   aria-label="Attach files"
                 >
-                  <PaperclipIcon className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
-                  <span className="text-xs font-medium">Attach</span>
+                  <PaperclipIcon className="size-4 text-muted-foreground group-hover:text-cyan-400 group-hover:scale-110 transition-all" strokeWidth={2} />
                   {localAttachments.length > 0 && (
-                    <span className="ml-0.5 inline-flex size-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-black">
+                    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-black ring-2 ring-background">
                       {localAttachments.length}
                     </span>
                   )}
@@ -1042,6 +1070,7 @@ function ChatView({
                 <VoiceDictation
                   onTranscript={handleVoiceTranscript}
                   disabled={isGenerating}
+                  className="h-8 sm:h-9 px-3 rounded-full text-xs"
                 />
                 {isGroup && bots.length > 1 && (
                   <PromptInputSelect
@@ -1052,10 +1081,10 @@ function ChatView({
                       }
                     }}
                   >
-                    <PromptInputSelectTrigger className="h-8 min-w-[150px] max-w-[200px] gap-2 px-2.5 text-xs font-medium border border-border bg-muted/60 hover:bg-muted text-foreground transition-colors rounded-lg shadow-xs cursor-pointer">
+                    <PromptInputSelectTrigger className="h-8 min-w-[140px] max-w-[190px] gap-2 px-2.5 text-xs font-medium border border-border/80 bg-secondary/70 hover:bg-secondary text-foreground transition-colors rounded-full shadow-2xs cursor-pointer">
                       <ChatAvatar
                         seed={selectedBot?.avatar || selectedBot?.name || ""}
-                        className="size-4 rounded-xs shrink-0"
+                        className="size-4 rounded-full shrink-0"
                       />
                       <span className="truncate flex-1 text-left">{selectedBot?.name ?? "Pick bot"}</span>
                       <span className="size-1.5 rounded-full bg-cyan-500 shrink-0" />
@@ -1066,7 +1095,7 @@ function ChatView({
                           <div className="flex items-center gap-2.5 w-full">
                             <ChatAvatar
                               seed={b.avatar || b.name}
-                              className="size-5 rounded-xs shrink-0"
+                              className="size-5 rounded-full shrink-0"
                             />
                             <div className="flex flex-col min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-1">
@@ -1088,11 +1117,34 @@ function ChatView({
                   </PromptInputSelect>
                 )}
               </PromptInputTools>
-              <PromptInputSubmit
-                status={status}
-                onStop={stop}
-                className="min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-8 rounded-lg cursor-pointer"
-              />
+
+              {/* Modern ChatGPT/Claude style circular submit button */}
+              <button
+                type="submit"
+                disabled={!isGenerating && !promptText.trim() && localAttachments.length === 0}
+                onClick={(e) => {
+                  if (isGenerating) {
+                    e.preventDefault()
+                    stop()
+                  }
+                }}
+                aria-label={isGenerating ? "Stop generating" : "Send message"}
+                title={isGenerating ? "Stop generating" : "Send message"}
+                className={cn(
+                  "inline-flex items-center justify-center size-8 sm:size-9 rounded-full transition-all duration-200 select-none shrink-0",
+                  isGenerating
+                    ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer active:scale-95"
+                    : (promptText.trim() || localAttachments.length > 0)
+                    ? "bg-cyan-500 hover:bg-cyan-400 text-black shadow-md shadow-cyan-500/25 cursor-pointer active:scale-95"
+                    : "bg-muted text-muted-foreground/40 cursor-not-allowed"
+                )}
+              >
+                {isGenerating ? (
+                  <Square className="size-3.5 fill-current" />
+                ) : (
+                  <ArrowUp className="size-4 stroke-[2.5]" />
+                )}
+              </button>
             </PromptInputFooter>
           </PromptInput>
         </div>
@@ -1202,6 +1254,217 @@ export function getToolDisplayInfo(toolName: string, input: any) {
         icon: Cpu,
       }
   }
+}
+
+export type GroupedMessagePart =
+  | { type: "text"; text: string; key: string }
+  | { type: "reasoning"; part: any; key: string }
+  | { type: "showScreen"; part: any; key: string }
+  | { type: "handoff"; part: any; key: string }
+  | { type: "toolGroup"; parts: any[]; key: string }
+
+export function groupMessageParts(parts: any[]): GroupedMessagePart[] {
+  const grouped: GroupedMessagePart[] = []
+  let currentToolGroup: any[] = []
+
+  const flushToolGroup = () => {
+    if (currentToolGroup.length > 0) {
+      grouped.push({
+        type: "toolGroup",
+        parts: [...currentToolGroup],
+        key: `tool-group-${grouped.length}-${currentToolGroup[0]?.toolCallId || Math.random()}`,
+      })
+      currentToolGroup = []
+    }
+  }
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    if (part.type === "text") {
+      flushToolGroup()
+      if (part.text?.trim()) {
+        grouped.push({ type: "text", text: part.text, key: `text-${i}` })
+      }
+    } else if (part.type === "reasoning") {
+      flushToolGroup()
+      grouped.push({ type: "reasoning", part, key: `reasoning-${i}` })
+    } else if (isToolUIPart(part)) {
+      const toolName = getToolName(part)
+      if (toolName === "viewScreen") {
+        // internal only, never rendered in chat
+        continue
+      }
+      if (
+        toolName === "showScreen" &&
+        part.state === "output-available" &&
+        (part.output as any)?.screenshot
+      ) {
+        flushToolGroup()
+        grouped.push({ type: "showScreen", part, key: `screen-${i}` })
+      } else if (toolName === "handoff") {
+        flushToolGroup()
+        grouped.push({ type: "handoff", part, key: `handoff-${i}` })
+      } else {
+        currentToolGroup.push(part)
+      }
+    }
+  }
+
+  flushToolGroup()
+  return grouped
+}
+
+export function ToolGroupView({
+  parts,
+  sourceBot,
+  onSelectBot,
+}: {
+  parts: any[]
+  sourceBot?: any
+  onSelectBot?: (botId: string) => void
+}) {
+  const isAnyRunning = parts.some(
+    (p) =>
+      p.state === "input-available" ||
+      p.state === "input-streaming" ||
+      p.state === "call"
+  )
+
+  const [isOpen, setIsOpen] = React.useState(isAnyRunning)
+
+  React.useEffect(() => {
+    if (isAnyRunning) {
+      setIsOpen(true)
+    }
+  }, [isAnyRunning])
+
+  if (parts.length === 0) return null
+
+  // Single tool call: render standard compact ToolPartView directly
+  if (parts.length === 1) {
+    return (
+      <ToolPartView
+        part={parts[0]}
+        sourceBot={sourceBot}
+        onSelectBot={onSelectBot}
+      />
+    )
+  }
+
+  // Multiple tool calls: generate a concise Gemini / ChatGPT style activity bar
+  const searches = parts.filter(
+    (p) => getToolName(p) === "webSearch" || getToolName(p) === "searchImages"
+  )
+  const bashCommands = parts.filter((p) => getToolName(p) === "bash")
+  const desktopActions = parts.filter((p) =>
+    [
+      "mouseClick",
+      "mouseMove",
+      "mouseScroll",
+      "keyboardType",
+      "keyboardPress",
+    ].includes(getToolName(p))
+  )
+
+  let summaryTitle = `${parts.length} actions completed`
+  let IconComponent = Sparkles
+
+  if (searches.length === parts.length) {
+    const webCount = parts.filter((p) => getToolName(p) === "webSearch").length
+    const imgCount = parts.filter((p) => getToolName(p) === "searchImages").length
+    if (imgCount > 0 && webCount > 0) {
+      summaryTitle = `Researched web & ${imgCount} image ${imgCount === 1 ? "query" : "queries"}`
+    } else if (imgCount > 0) {
+      summaryTitle = `Searched ${imgCount} image ${imgCount === 1 ? "source" : "sources"}`
+    } else {
+      summaryTitle = `Searched web (${webCount} ${webCount === 1 ? "query" : "queries"})`
+    }
+    IconComponent = Search
+  } else if (bashCommands.length === parts.length) {
+    summaryTitle = `Executed ${bashCommands.length} terminal ${bashCommands.length === 1 ? "command" : "commands"}`
+    IconComponent = TerminalIcon
+  } else if (desktopActions.length > 0) {
+    summaryTitle = `Performed ${parts.length} desktop & terminal actions`
+    IconComponent = MonitorDot
+  }
+
+  const activeRunningTool = parts.find(
+    (p) =>
+      p.state === "input-available" ||
+      p.state === "input-streaming" ||
+      p.state === "call"
+  )
+  const activeRunningInfo = activeRunningTool
+    ? getToolDisplayInfo(getToolName(activeRunningTool), activeRunningTool.input)
+    : null
+
+  return (
+    <div className="w-full max-w-2xl my-1.5 not-prose">
+      {/* Sleek Gemini / ChatGPT style activity toggle bar */}
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        className={cn(
+          "flex items-center justify-between w-full px-3 py-1.5 rounded-xl border text-xs transition-all duration-150 cursor-pointer select-none shadow-2xs group",
+          isAnyRunning
+            ? "border-cyan-500/40 bg-cyan-500/5 ring-1 ring-cyan-500/20 text-cyan-400"
+            : "border-border/60 bg-card/60 hover:bg-card/90 text-foreground"
+        )}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div
+            className={cn(
+              "flex size-5 shrink-0 items-center justify-center rounded-md border shadow-2xs",
+              isAnyRunning
+                ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400"
+                : "bg-secondary text-cyan-500 border-border/70"
+            )}
+          >
+            {isAnyRunning ? (
+              <span className="size-2 rounded-full bg-cyan-400 animate-ping" />
+            ) : (
+              <IconComponent className="size-3 text-cyan-500" strokeWidth={1.75} />
+            )}
+          </div>
+          <span className="font-medium text-xs truncate">
+            {isAnyRunning && activeRunningInfo?.title
+              ? `Running: ${activeRunningInfo.title}`
+              : summaryTitle}
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded border border-border/40 shrink-0">
+            {isAnyRunning ? "In progress" : `${parts.length} steps`}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground group-hover:text-foreground">
+          <span className="text-[10px] hidden sm:inline text-muted-foreground/70 font-mono">
+            {isOpen ? "Hide activity" : "View activity"}
+          </span>
+          <ChevronDown
+            className={cn(
+              "size-3.5 transition-transform duration-200",
+              isOpen && "rotate-180"
+            )}
+            strokeWidth={1.75}
+          />
+        </div>
+      </button>
+
+      {/* Expanded timeline view */}
+      {isOpen && (
+        <div className="mt-1.5 ml-2.5 pl-3 border-l-2 border-border/60 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+          {parts.map((p, idx) => (
+            <ToolPartView
+              key={p.toolCallId || `part-${idx}`}
+              part={p}
+              sourceBot={sourceBot}
+              onSelectBot={onSelectBot}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function ToolPartView({

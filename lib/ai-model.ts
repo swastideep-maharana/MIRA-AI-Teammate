@@ -76,7 +76,11 @@ export function isRateLimitOrQuotaError(err: unknown): boolean {
     msg.includes("no longer available") ||
     msg.includes("deprecated") ||
     msg.includes("does not exist") ||
-    msg.includes("cannot find model")
+    msg.includes("cannot find model") ||
+    msg.includes("do not have access") ||
+    msg.includes("access to it") ||
+    msg.includes("permission_denied") ||
+    msg.includes("unauthorized")
   )
 }
 
@@ -207,7 +211,7 @@ export function getLanguageModel(options?: ModelOptions): LanguageModelV4 {
     // Cross-provider fallback to Groq if Groq key is available:
     if (groqApiKey) {
       fallbacks.push(groqInstance("qwen/qwen3.8-27b"))
-      fallbacks.push(groqInstance("llama-3.3-70b-versatile"))
+      fallbacks.push(groqInstance("openai/gpt-oss-20b"))
     }
 
     return createResilientLanguageModel(primary, fallbacks)
@@ -221,8 +225,7 @@ export function getLanguageModel(options?: ModelOptions): LanguageModelV4 {
 
     const fallbacks: LanguageModelV4[] = [
       groqInstance("qwen/qwen3.8-27b"),
-      groqInstance("llama-3.3-70b-versatile"),
-      groqInstance("llama-3.1-8b-instant"),
+      groqInstance("openai/gpt-oss-20b"),
     ]
 
     // Cross-provider fallback to Google if Google key is available:
