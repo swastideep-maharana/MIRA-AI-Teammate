@@ -251,6 +251,12 @@ ${
           if (err.message.includes("Tool result is missing") || err.message.includes("AI_MissingToolResultsError")) {
             return "Background action finished. Please retry your message to continue."
           }
+          if (err.message.includes("Non-image file") || err.message.includes("functionality not supported")) {
+            return "Document format adapted. Please retry your message to continue."
+          }
+          if (err.message.includes("does not exist") || err.message.includes("do not have access")) {
+            return "Model access refreshed. Please click Retry to continue with the optimized model."
+          }
           return err.message
         }
         return "An error occurred while streaming the AI response. Please try again."

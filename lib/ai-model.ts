@@ -80,8 +80,52 @@ export function isRateLimitOrQuotaError(err: unknown): boolean {
     msg.includes("do not have access") ||
     msg.includes("access to it") ||
     msg.includes("permission_denied") ||
-    msg.includes("unauthorized")
+    msg.includes("unauthorized") ||
+    msg.includes("non-image file content parts") ||
+    msg.includes("unsupportedfunctionalityerror") ||
+    msg.includes("functionality not supported") ||
+    msg.includes("not supported")
   )
+}
+
+/**
+ * Sanitizes model parameters before calling a specific provider.
+ * Providers like Groq support image URLs/data but do NOT support non-image file content parts (e.g. PDFs, docs).
+ * For non-image parts, we convert them into descriptive text so Groq never throws UnsupportedFunctionalityError.
+ */
+function adaptParamsForCandidate(params: any, candidate: LanguageModelV4): any {
+  const isGroq =
+    candidate.provider?.includes("groq") ||
+    (candidate as any).modelId?.includes("qwen") ||
+    (candidate as any).modelId?.includes("gpt-oss")
+  if (!isGroq || !Array.isArray(params.prompt)) return params
+
+  const adaptedPrompt = params.prompt.map((msg: any) => {
+    if (!Array.isArray(msg.content)) return msg
+    const adaptedContent = msg.content.map((part: any) => {
+      if (part.type === "file") {
+        const mediaType = part.mediaType || ""
+        if (!mediaType.startsWith("image/")) {
+          const filename = part.filename || "attached document"
+          const textContent =
+            part.data?.type === "text" && typeof part.data?.text === "string"
+              ? `\nContent:\n${part.data.text}`
+              : ""
+          return {
+            type: "text",
+            text: `[Attached Document: ${filename} (${mediaType || "file"})]${textContent}`,
+          }
+        }
+      }
+      return part
+    })
+    return { ...msg, content: adaptedContent }
+  })
+
+  return {
+    ...params,
+    prompt: adaptedPrompt,
+  }
 }
 
 /**
@@ -107,13 +151,16 @@ export function createResilientLanguageModel(
         for (let i = 0; i < allModels.length; i++) {
           const candidate = allModels[i]
           try {
-            if (i === 0) {
+            const adaptedParams = adaptParamsForCandidate(params, candidate)
+            if (i === 0 && !candidate.provider?.includes("groq")) {
               return await doGenerate()
             } else {
-              console.warn(
-                `[AI Resilience] Falling back generate to model: ${candidate.modelId} (${candidate.provider})`
-              )
-              return await candidate.doGenerate(params)
+              if (i > 0) {
+                console.warn(
+                  `[AI Resilience] Falling back generate to model: ${candidate.modelId} (${candidate.provider})`
+                )
+              }
+              return await candidate.doGenerate(adaptedParams)
             }
           } catch (err) {
             lastErr = err
@@ -134,13 +181,16 @@ export function createResilientLanguageModel(
         for (let i = 0; i < allModels.length; i++) {
           const candidate = allModels[i]
           try {
-            if (i === 0) {
+            const adaptedParams = adaptParamsForCandidate(params, candidate)
+            if (i === 0 && !candidate.provider?.includes("groq")) {
               return await doStream()
             } else {
-              console.warn(
-                `[AI Resilience] Seamlessly falling back stream to model: ${candidate.modelId} (${candidate.provider})`
-              )
-              return await candidate.doStream(params)
+              if (i > 0) {
+                console.warn(
+                  `[AI Resilience] Seamlessly falling back stream to model: ${candidate.modelId} (${candidate.provider})`
+                )
+              }
+              return await candidate.doStream(adaptedParams)
             }
           } catch (err) {
             lastErr = err
