@@ -44,7 +44,7 @@ export interface ModelOptions {
 
 /**
  * Returns true if the given error indicates an API rate limit, quota exhaustion,
- * temporary concurrency ceiling, or server-side service overload.
+ * temporary concurrency ceiling, server-side service overload, or invalid/deprecated model.
  */
 export function isRateLimitOrQuotaError(err: unknown): boolean {
   if (!err) return false
@@ -57,6 +57,8 @@ export function isRateLimitOrQuotaError(err: unknown): boolean {
     status === 500 ||
     status === 502 ||
     status === 504 ||
+    status === 404 ||
+    status === 400 ||
     msg.includes("429") ||
     msg.includes("quota") ||
     msg.includes("resource_exhausted") ||
@@ -69,13 +71,18 @@ export function isRateLimitOrQuotaError(err: unknown): boolean {
     msg.includes("overloaded") ||
     msg.includes("temporarily unavailable") ||
     msg.includes("service unavailable") ||
-    msg.includes("capacity")
+    msg.includes("capacity") ||
+    msg.includes("not found") ||
+    msg.includes("no longer available") ||
+    msg.includes("deprecated") ||
+    msg.includes("does not exist") ||
+    msg.includes("cannot find model")
   )
 }
 
 /**
  * Wraps a primary LanguageModel with an ordered list of fallback models.
- * If the primary model encounters a rate limit (429, TPM, quota exceeded, 503),
+ * If the primary model encounters a rate limit (429, TPM, quota exceeded, 503, or 404 deprecated),
  * it seamlessly fails over to the next candidate model in the chain so the user's
  * conversation stream continues without disruption.
  */
@@ -156,18 +163,25 @@ export function getLanguageModel(options?: ModelOptions): LanguageModelV4 {
   const groqInstance = groqApiKey ? createGroq({ apiKey: groqApiKey }) : groq
 
   // 1. Direct Multimodal Context (Files / attachments attached):
-  // Uses Gemini 2.5 Flash / 3 Flash with fallback to Gemini 1.5 Flash
+  // Uses Gemini 3 Flash Preview with multi-tier Google & Groq fallbacks
   if (options?.hasAttachments) {
     const rawMultiModel =
       resolveEnvKey("AI_MULTIMODAL_MODEL") ||
       process.env.AI_MULTIMODAL_MODEL ||
-      "gemini-2.5-flash"
-    const primary = google(rawMultiModel)
+      "gemini-3-flash-preview"
+    const cleanMultiModel = rawMultiModel.includes("2.5") || rawMultiModel.includes("gpt-oss")
+      ? "gemini-3-flash-preview"
+      : rawMultiModel
+    const primary = google(cleanMultiModel)
     const fallbacks: LanguageModelV4[] = [
-      google("gemini-2.5-flash"),
       google("gemini-3-flash-preview"),
+      google("gemini-3.5-flash"),
+      google("gemini-2.0-flash"),
       google("gemini-1.5-flash"),
     ]
+    if (groqApiKey) {
+      fallbacks.push(groqInstance("qwen/qwen3.8-27b"))
+    }
     return createResilientLanguageModel(primary, fallbacks)
   }
 
@@ -176,21 +190,24 @@ export function getLanguageModel(options?: ModelOptions): LanguageModelV4 {
     const rawModel =
       resolveEnvKey("AI_MODEL") ||
       process.env.AI_MODEL ||
-      "gemini-2.5-flash"
-    const cleanModel = rawModel.includes("gpt-oss") || rawModel.includes("/") ? "gemini-2.5-flash" : rawModel
+      "gemini-3-flash-preview"
+    const cleanModel =
+      rawModel.includes("2.5") || rawModel.includes("gpt-oss") || rawModel.includes("/")
+        ? "gemini-3-flash-preview"
+        : rawModel
     const primary = google(cleanModel)
 
     const fallbacks: LanguageModelV4[] = [
-      google("gemini-2.5-flash"),
       google("gemini-3-flash-preview"),
+      google("gemini-3.5-flash"),
       google("gemini-2.0-flash"),
       google("gemini-1.5-flash"),
     ]
 
     // Cross-provider fallback to Groq if Groq key is available:
     if (groqApiKey) {
-      fallbacks.push(groqInstance("llama-3.3-70b-versatile"))
       fallbacks.push(groqInstance("qwen/qwen3.8-27b"))
+      fallbacks.push(groqInstance("llama-3.3-70b-versatile"))
     }
 
     return createResilientLanguageModel(primary, fallbacks)
@@ -198,28 +215,33 @@ export function getLanguageModel(options?: ModelOptions): LanguageModelV4 {
 
   // 3. Groq Provider with Fallback Chain:
   if (configuredProvider === "groq" || groqApiKey) {
-    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "llama-3.3-70b-versatile"
-    const cleanModel = rawModel.includes("gpt-oss") ? "llama-3.3-70b-versatile" : rawModel
+    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "qwen/qwen3.8-27b"
+    const cleanModel = rawModel.includes("gpt-oss") || rawModel.includes("2.5") ? "qwen/qwen3.8-27b" : rawModel
     const primary = groqInstance(cleanModel)
 
     const fallbacks: LanguageModelV4[] = [
-      groqInstance("llama-3.3-70b-versatile"),
       groqInstance("qwen/qwen3.8-27b"),
+      groqInstance("llama-3.3-70b-versatile"),
       groqInstance("llama-3.1-8b-instant"),
     ]
 
     // Cross-provider fallback to Google if Google key is available:
     if (googleApiKey) {
-      fallbacks.push(google("gemini-2.5-flash"))
+      fallbacks.push(google("gemini-3-flash-preview"))
+      fallbacks.push(google("gemini-3.5-flash"))
       fallbacks.push(google("gemini-1.5-flash"))
     }
 
     return createResilientLanguageModel(primary, fallbacks)
   }
 
-  // 4. Ultimate Fallback to Gemini 2.5 Flash with fallback chain
-  const defaultPrimary = google("gemini-2.5-flash")
-  const defaultFallbacks: LanguageModelV4[] = [google("gemini-1.5-flash"), google("gemini-2.0-flash")]
+  // 4. Ultimate Fallback to Gemini 3 Flash Preview with fallback chain
+  const defaultPrimary = google("gemini-3-flash-preview")
+  const defaultFallbacks: LanguageModelV4[] = [
+    google("gemini-3.5-flash"),
+    google("gemini-2.0-flash"),
+    google("gemini-1.5-flash"),
+  ]
   return createResilientLanguageModel(defaultPrimary, defaultFallbacks)
 }
 
@@ -230,7 +252,7 @@ export function getActiveModelInfo(options?: ModelOptions) {
       model:
         resolveEnvKey("AI_MULTIMODAL_MODEL") ||
         process.env.AI_MULTIMODAL_MODEL ||
-        "gemini-2.5-flash",
+        "gemini-3-flash-preview",
       hasKey: Boolean(resolveEnvKey("GOOGLE_GENERATIVE_AI_API_KEY") || process.env.GOOGLE_GENERATIVE_AI_API_KEY),
     }
   }
@@ -240,8 +262,11 @@ export function getActiveModelInfo(options?: ModelOptions) {
   const groqApiKey = resolveEnvKey("GROQ_API_KEY") || process.env.GROQ_API_KEY
 
   if (configuredProvider === "google" || (googleApiKey && configuredProvider !== "groq")) {
-    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "gemini-2.5-flash"
-    const model = rawModel.includes("gpt-oss") || rawModel.includes("/") ? "gemini-2.5-flash" : rawModel
+    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "gemini-3-flash-preview"
+    const model =
+      rawModel.includes("2.5") || rawModel.includes("gpt-oss") || rawModel.includes("/")
+        ? "gemini-3-flash-preview"
+        : rawModel
     return {
       provider: "google (multi-tier resilient fallback)",
       model,
@@ -250,8 +275,8 @@ export function getActiveModelInfo(options?: ModelOptions) {
   }
 
   if (configuredProvider === "groq" || groqApiKey) {
-    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "llama-3.3-70b-versatile"
-    const model = rawModel.includes("gpt-oss") ? "llama-3.3-70b-versatile" : rawModel
+    const rawModel = resolveEnvKey("AI_MODEL") || process.env.AI_MODEL || "qwen/qwen3.8-27b"
+    const model = rawModel.includes("gpt-oss") || rawModel.includes("2.5") ? "qwen/qwen3.8-27b" : rawModel
     return {
       provider: "groq (multi-tier resilient fallback)",
       model,
@@ -261,7 +286,7 @@ export function getActiveModelInfo(options?: ModelOptions) {
 
   return {
     provider: "google",
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
     hasKey: Boolean(googleApiKey),
   }
 }

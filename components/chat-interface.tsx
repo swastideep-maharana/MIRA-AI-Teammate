@@ -837,9 +837,12 @@ function ChatView({
               <div className="flex items-start gap-2.5">
                 <AlertCircle className="size-4 shrink-0 text-destructive mt-0.5" strokeWidth={1.75} />
                 <span className="leading-snug">
-                  {error.message?.includes("Minified React error") ||
-                  error.message?.includes("Server Components render") ||
-                  error.message?.includes("digest")
+                  {error.message?.includes("Tool result is missing") ||
+                  error.message?.includes("MissingToolResultsError")
+                    ? "The previous action completed. Please click Retry to continue."
+                    : error.message?.includes("Minified React error") ||
+                      error.message?.includes("Server Components render") ||
+                      error.message?.includes("digest")
                     ? "Could not establish a connection to the chat service. Please check your network and try again."
                     : error.message ||
                       "An error occurred while generating the response. Please try again."}

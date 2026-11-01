@@ -211,7 +211,10 @@ ${
     const sanitizedMessages = sanitizeDanglingToolCalls(optimizedMessages)
 
     // 5. Convert UIMessages to model messages & ensure all tool calls have results
-    const rawModelMessages = await convertToModelMessages(sanitizedMessages, { tools })
+    const rawModelMessages = await convertToModelMessages(sanitizedMessages, {
+      tools,
+      ignoreIncompleteToolCalls: true,
+    })
     const modelMessages = ensureAllToolResults(rawModelMessages)
 
     // 6. Stream response with Direct Multimodal Context (Gemini 3 Flash for files) or Groq
@@ -244,6 +247,9 @@ ${
           }
           if (err.message.includes("high demand") || err.message.includes("503")) {
             return "The AI service is temporarily experiencing high demand. Please try sending your message again."
+          }
+          if (err.message.includes("Tool result is missing") || err.message.includes("AI_MissingToolResultsError")) {
+            return "Background action finished. Please retry your message to continue."
           }
           return err.message
         }

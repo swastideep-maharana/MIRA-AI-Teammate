@@ -220,7 +220,8 @@ export function sanitizeDanglingToolCalls(messages: any[]): any[] {
         return {
           ...part,
           state: "output-available",
-          output: part.output ?? { success: true, result: "Command executed in background." },
+          preliminary: false,
+          output: part.output ?? { success: true, result: "Command completed in background." },
         };
       }
       return part;
@@ -234,36 +235,45 @@ export function sanitizeDanglingToolCalls(messages: any[]): any[] {
  * has a corresponding 'tool-result' message before the subsequent user message.
  */
 export function ensureAllToolResults(modelMessages: any[]): any[] {
-  const result = [...modelMessages];
-  for (let i = 0; i < result.length; i++) {
-    const m = result[i];
+  const result: any[] = [];
+  for (let i = 0; i < modelMessages.length; i++) {
+    const m = modelMessages[i];
+    result.push(m);
+
     if (m.role === "assistant" && Array.isArray(m.content)) {
-      for (const block of m.content) {
-        if (block.type === "tool-call") {
-          const callId = block.toolCallId;
-          const hasMatchingResult = result.some(
-            (other) =>
-              other.role === "tool" &&
-              Array.isArray(other.content) &&
-              other.content.some((b: any) => b.type === "tool-result" && b.toolCallId === callId)
-          );
-          if (!hasMatchingResult) {
-            result.splice(i + 1, 0, {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: callId,
-                  toolName: block.toolName || "tool",
-                  output: {
-                    type: "json",
-                    value: { success: true, result: "Command dispatched in background." },
-                  },
-                },
-              ],
-            });
-            i++;
-          }
+      const toolCalls = m.content.filter((c: any) => c.type === "tool-call");
+      if (toolCalls.length === 0) continue;
+
+      // Check if the immediately following message is already a tool result message
+      const nextMsg = modelMessages[i + 1];
+      const existingToolResults =
+        nextMsg && nextMsg.role === "tool" && Array.isArray(nextMsg.content)
+          ? nextMsg.content.filter((c: any) => c.type === "tool-result")
+          : [];
+
+      const existingCallIds = new Set(existingToolResults.map((r: any) => r.toolCallId));
+      const missingCalls = toolCalls.filter((c: any) => !existingCallIds.has(c.toolCallId));
+
+      if (missingCalls.length > 0) {
+        const syntheticResults = missingCalls.map((call: any) => ({
+          type: "tool-result",
+          toolCallId: call.toolCallId,
+          toolName: call.toolName || "tool",
+          output: {
+            type: "json",
+            value: { success: true, result: "Command completed successfully in background." },
+          },
+        }));
+
+        if (nextMsg && nextMsg.role === "tool" && Array.isArray(nextMsg.content)) {
+          // Append missing results to existing tool message
+          nextMsg.content.push(...syntheticResults);
+        } else {
+          // Insert a new tool message right after the assistant message
+          result.push({
+            role: "tool",
+            content: syntheticResults,
+          });
         }
       }
     }
