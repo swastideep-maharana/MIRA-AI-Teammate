@@ -223,7 +223,7 @@ ${
       system,
       messages: modelMessages,
       tools,
-      stopWhen: stepCountIs(6),
+      stopWhen: stepCountIs(10),
       maxRetries: 3,
     })
 

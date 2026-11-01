@@ -282,6 +282,8 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
     }
   }
 
+  let webSearchCounter = 0
+
   return {
     webSearch: tool({
       description:
@@ -290,6 +292,18 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
         query: z.string().min(1, "Query cannot be empty").max(500, "Query exceeds 500 characters").describe("Search keywords or query"),
       }),
       execute: async ({ query }) => {
+        webSearchCounter++
+        if (webSearchCounter > 1) {
+          return {
+            success: true,
+            query,
+            count: 0,
+            results: [],
+            instruction:
+              "Maximum webSearch limit (1 query) reached for this question. Do NOT call webSearch again. Immediately synthesize the findings and output your complete, comprehensive final answer to the user in text now.",
+          }
+        }
+
         try {
           return await withTimeout(
             (async () => {
@@ -346,6 +360,8 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
                       query,
                       count: Math.min(results.length, 5),
                       results: results.slice(0, 5),
+                      instruction:
+                        "Search completed successfully. You now have fresh web data. Do NOT execute any more search queries. Synthesize your findings and output your detailed, well-structured final answer to the user in text now.",
                     }
                   }
                 }
@@ -386,6 +402,8 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
                       query,
                       count: results.length,
                       results,
+                      instruction:
+                        "Search completed successfully. Do NOT call webSearch again. Write your comprehensive, detailed final answer to the user in text now.",
                     }
                   }
                 }
@@ -415,6 +433,8 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
                       query,
                       count: wikiResults.length,
                       results: wikiResults.slice(0, 5),
+                      instruction:
+                        "Search completed successfully. Do NOT call webSearch again. Write your comprehensive, detailed final answer to the user in text now.",
                     }
                   }
                 }
@@ -426,6 +446,8 @@ export function createDaytonaTools(context?: DaytonaToolContext) {
                 count: 0,
                 results: [],
                 message: "No search results found.",
+                instruction:
+                  "Search completed. Provide your best answer based on your broad internal knowledge base directly in text now.",
               }
             })(),
             12000,

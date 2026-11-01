@@ -438,7 +438,7 @@ You can inspect, extract, or process these files directly using Python, grep, or
         system,
         messages: modelOptimizedMessages,
         tools,
-        stopWhen: stepCountIs(8),
+        stopWhen: stepCountIs(10),
         maxRetries: 2,
         abortSignal: signal,
         onFinish: async ({ usage }) => {
