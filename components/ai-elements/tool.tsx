@@ -23,15 +23,19 @@ import { CodeBlock } from "./code-block";
 
 export type ToolProps = ComponentProps<typeof Collapsible> & {
   state?: ToolPart["state"];
+  nested?: boolean;
 };
 
-export const Tool = ({ className, state, ...props }: ToolProps) => {
+export const Tool = ({ className, state, nested = false, ...props }: ToolProps) => {
   const isRunning = state === "input-available" || state === "input-streaming" || state === "approval-requested";
 
   return (
     <Collapsible
       className={cn(
-        "group not-prose my-1 w-full max-w-2xl rounded-md border border-border/60 bg-card/60 hover:bg-card/85 transition-all duration-150 overflow-hidden text-xs shadow-2xs",
+        "group not-prose w-full max-w-3xl overflow-hidden text-xs transition-all duration-150",
+        nested
+          ? "my-0.5 rounded-md border border-transparent hover:border-border/50 hover:bg-muted/30"
+          : "my-1 rounded-md border border-border/60 bg-card/60 hover:bg-card/85 shadow-2xs",
         isRunning && "border-cyan-500/40 bg-cyan-500/5 ring-1 ring-cyan-500/20",
         className
       )}

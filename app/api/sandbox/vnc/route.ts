@@ -1,4 +1,7 @@
 import { auth } from "@clerk/nextjs/server"
+import { and, eq } from "drizzle-orm"
+import { db } from "@/db"
+import { bots } from "@/db/schema"
 import { daytona } from "@/lib/daytona"
 
 export const maxDuration = 60
@@ -15,6 +18,18 @@ export async function GET(req: Request) {
 
     if (!sandboxId) {
       return Response.json({ error: "Missing sandboxId parameter." }, { status: 400 })
+    }
+
+    // Verify sandbox ownership before issuing signed preview URLs
+    const ownedBot = await db.query.bots.findFirst({
+      where: and(eq(bots.userId, userId), eq(bots.sandboxId, sandboxId)),
+      columns: { id: true },
+    })
+    if (!ownedBot) {
+      return Response.json(
+        { error: "Sandbox not found for your account." },
+        { status: 403 }
+      )
     }
 
     if (!process.env.DAYTONA_API_KEY) {

@@ -25,11 +25,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogOverlay,
-  DialogPortal,
-} from "@/components/ui/dialog"
 
 interface SandboxVncPreviewProps {
   sandboxId?: string | null
@@ -137,21 +132,16 @@ export function SandboxVncPreview({
     }
   }, [acceptUrl, iframeKey])
 
-  // Ensure that whenever isFullscreen is false, no stuck blurry dialog backdrops remain in the DOM
   useEffect(() => {
-    if (!isFullscreen) {
-      const strayOverlays = document.querySelectorAll(
-        '[data-slot="dialog-overlay"]'
-      )
-      strayOverlays.forEach((el) => el.remove())
+    if (!isFullscreen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullscreen(false)
+      }
     }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isFullscreen])
-
-  const handleOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      setIsFullscreen(false)
-    }
-  }, [])
 
   const cycleScaleMode = () => {
     setScaleMode((current) => {
@@ -176,14 +166,11 @@ export function SandboxVncPreview({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-1.5 min-w-0">
             {isLoading || isRefreshing ? (
-              <span className="size-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+              <span className="size-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
             ) : error ? (
               <span className="size-2 rounded-full bg-rose-500 shrink-0" />
             ) : (
-              <span className="relative flex size-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full size-2 bg-emerald-500 shadow-xs ring-1 ring-emerald-500/50" />
-              </span>
+              <span className="size-2 rounded-full bg-emerald-500 shrink-0 ring-2 ring-emerald-500/20" />
             )}
             <span className="text-xs font-semibold text-foreground truncate">
               {isLoading
@@ -379,8 +366,10 @@ export function SandboxVncPreview({
             <div
               ref={containerRef}
               className={cn(
-                "relative w-full aspect-[16/10] shrink-0 rounded-xl overflow-hidden border border-border bg-black shadow-lg flex items-center justify-center transition-all",
-                scaleMode === "fill" && "aspect-auto h-[480px]"
+                "relative w-full shrink-0 rounded-xl overflow-hidden border border-border bg-black shadow-lg flex items-center justify-center transition-all",
+                scaleMode === "16:10" && "aspect-[16/10]",
+                scaleMode === "fit" && "aspect-video",
+                scaleMode === "fill" && "h-[520px]"
               )}
             >
               {/* VNC iframe container */}
@@ -485,15 +474,12 @@ export function SandboxVncPreview({
             {/* Bottom metadata footer bar */}
             <div className="flex items-center justify-between w-full px-3 py-1.5 text-xs text-muted-foreground border border-border/50 bg-card/60 rounded-lg shadow-2xs shrink-0">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="relative flex size-1.5 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full size-1.5 bg-emerald-500" />
-                </span>
+                <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
                 <span className="truncate font-medium text-[11px] text-foreground">{screenTitle}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0 font-mono text-[10px] text-muted-foreground">
                 <span className="px-1.5 py-0.5 rounded bg-muted/60 border border-border/50">
-                  {scaleMode === "16:10" ? "1280×800 (16:10)" : scaleMode.toUpperCase()}
+                  {scaleMode === "fit" ? "16:9 Fit" : scaleMode === "fill" ? "Fill" : "16:10 Framed"}
                 </span>
               </div>
             </div>
@@ -505,8 +491,8 @@ export function SandboxVncPreview({
                   <Activity className="size-3.5 text-cyan-500" />
                   Runtime Diagnostics
                 </span>
-                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
                   Active
                 </span>
               </div>
@@ -527,8 +513,8 @@ export function SandboxVncPreview({
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-muted-foreground font-mono">Resolution</span>
-                  <span className="font-medium text-foreground text-xs">1280 × 800 (16:10)</span>
+                  <span className="text-[11px] text-muted-foreground font-mono">Display</span>
+                  <span className="font-medium text-foreground text-xs">1920 × 1080 ({scaleMode})</span>
                 </div>
               </div>
 
@@ -562,17 +548,13 @@ export function SandboxVncPreview({
         ) : null}
       </div>
 
-      {/* Fullscreen Backdrop Portal */}
+      {/* React-controlled Fullscreen Backdrop */}
       {isFullscreen && (
-        <Dialog
-          open={isFullscreen}
-          onOpenChange={handleOpenChange}
-          disablePointerDismissal={true}
-        >
-          <DialogPortal>
-            <DialogOverlay className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm" />
-          </DialogPortal>
-        </Dialog>
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
+          onClick={() => setIsFullscreen(false)}
+          aria-hidden="true"
+        />
       )}
     </div>
   )

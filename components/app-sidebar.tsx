@@ -282,7 +282,24 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
           <SidebarGroup className="group-data-[collapsible=icon]:p-0">
             <SidebarGroupContent>
               <SidebarMenu className="group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1">
-                {chats.map((chat) => {
+                {chats.length === 0 ? (
+                  <div className="px-3 py-6 text-center group-data-[collapsible=icon]:hidden">
+                    <p className="text-xs text-muted-foreground mb-2.5">
+                      No conversations yet
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBotDialogOpen(true)}
+                      className="h-7 gap-1.5 px-2.5 text-xs rounded-lg cursor-pointer"
+                    >
+                      <PlusIcon className="size-3.5" />
+                      New teammate
+                    </Button>
+                  </div>
+                ) : (
+                  chats.map((chat) => {
                   const isGroup = chat.kind === "group" || chat.members.length > 1
                   const bot = chat.members[0]?.bot
                   const name = chat.name || bot?.name || "Chat"
@@ -373,7 +390,7 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
                       </DropdownMenu>
                     </SidebarMenuItem>
                   )
-                })}
+                }))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

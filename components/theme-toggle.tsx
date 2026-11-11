@@ -14,6 +14,24 @@ export function ThemeToggle({ className }: { className?: string }) {
     setMounted(true)
   }, [])
 
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+      if (e.key.toLowerCase() !== "d") return
+      const target = e.target as HTMLElement | null
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable='true'], [role='textbox']"
+        )
+      ) {
+        return
+      }
+      setTheme(resolvedTheme === "dark" ? "light" : "dark")
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [resolvedTheme, setTheme])
+
   if (!mounted) {
     return (
       <Button

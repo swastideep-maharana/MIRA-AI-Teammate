@@ -507,7 +507,7 @@ function isSafeImageSrc(src: unknown): src is string {
   );
 }
 
-function StreamdownImg({ src, alt, className, ...props }: any) {
+export function StreamdownImg({ src, alt, className, ...props }: any) {
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -573,7 +573,7 @@ function StreamdownImg({ src, alt, className, ...props }: any) {
   );
 }
 
-function StreamdownA({ href, children, className, ...props }: any) {
+export function StreamdownA({ href, children, className, ...props }: any) {
   if (!href || typeof href !== "string" || href.startsWith("streamdown:")) {
     return (
       <span

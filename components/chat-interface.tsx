@@ -21,13 +21,10 @@ import {
   PromptInputTextarea,
   PromptInputFooter,
   PromptInputTools,
-  PromptInputSubmit,
   PromptInputSelect,
   PromptInputSelectTrigger,
   PromptInputSelectContent,
   PromptInputSelectItem,
-  PromptInputSelectValue,
-  PromptInputButton,
   usePromptInputAttachments,
 } from "@/components/ai-elements/prompt-input"
 import { GroupChatAvatar } from "@/components/group-chat-avatar"
@@ -264,17 +261,221 @@ function PromptAttachmentsPreview() {
   )
 }
 
-function PromptAttachButton() {
-  const attachments = usePromptInputAttachments()
+function UserAttachmentItem({
+  name,
+  contentType,
+  url,
+}: {
+  name?: string
+  contentType?: string
+  url?: string
+}) {
+  const [imgError, setImgError] = React.useState(false)
+  const displayName = name || "Document"
+  const isPdf =
+    contentType === "application/pdf" ||
+    displayName.toLowerCase().endsWith(".pdf")
+  const isImage = contentType?.startsWith("image/")
+  const isCode = /\.(ts|js|py|json|csv|md|txt|sh)$/i.test(displayName)
+
+  if (isImage && url && !imgError) {
+    return (
+      <div className="rounded-xl overflow-hidden border border-border/60 bg-muted/30 max-w-sm mt-1">
+        <img
+          src={url}
+          alt={displayName}
+          onError={() => setImgError(true)}
+          className="max-h-60 w-auto object-contain rounded-lg"
+        />
+        {name && (
+          <div className="px-2.5 py-1 text-[11px] font-mono text-muted-foreground truncate border-t border-border/40">
+            {name}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <PromptInputButton
-      tooltip="Attach documents or images (PDF, TXT, DOCX, PNG, JPG)"
-      onClick={attachments.openFileDialog}
-      className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
-      aria-label="Attach file"
-    >
-      <Paperclip className="size-4" strokeWidth={1.75} />
-    </PromptInputButton>
+    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/80 p-2.5 max-w-sm shadow-xs mt-1">
+      <div
+        className={cn(
+          "flex size-9 items-center justify-center rounded-lg shrink-0",
+          isPdf
+            ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+            : isCode
+              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+              : "bg-cyan-500/10 text-cyan-500 border border-cyan-500/20"
+        )}
+      >
+        {isPdf ? (
+          <FileText className="size-4.5" strokeWidth={1.75} />
+        ) : isCode ? (
+          <FileCode2 className="size-4.5" strokeWidth={1.75} />
+        ) : (
+          <File className="size-4.5" strokeWidth={1.75} />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <span className="block truncate text-xs font-semibold text-foreground">
+          {displayName}
+        </span>
+        <span className="block text-[10px] text-muted-foreground uppercase font-mono">
+          {isPdf ? "PDF Document" : isCode ? "Code / Data" : contentType || "File"}
+        </span>
+      </div>
+      {url && (
+        <a
+          href={url}
+          download={displayName}
+          className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
+          title="Download attachment"
+        >
+          <Download className="size-3.5" strokeWidth={1.75} />
+        </a>
+      )}
+    </div>
+  )
+}
+
+function ComposerFooter({
+  fileInputRef,
+  handleFileChange,
+  localAttachmentCount,
+  onVoiceTranscript,
+  isGenerating,
+  isGroup,
+  bots,
+  selectedBotId,
+  selectedBot,
+  onSelectBot,
+  promptText,
+  onStop,
+}: {
+  fileInputRef: React.RefObject<HTMLInputElement | null>
+  handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  localAttachmentCount: number
+  onVoiceTranscript: (transcript: string) => void
+  isGenerating: boolean
+  isGroup: boolean
+  bots: Array<any>
+  selectedBotId: string
+  selectedBot: any
+  onSelectBot: (botId: string) => void
+  promptText: string
+  onStop: () => void
+}) {
+  const promptAttachments = usePromptInputAttachments()
+  const totalAttachmentCount = localAttachmentCount + promptAttachments.files.length
+  const canSubmit = Boolean(promptText.trim()) || totalAttachmentCount > 0
+
+  return (
+    <PromptInputFooter className="items-center px-3 pb-2.5 pt-1 justify-between">
+      <PromptInputTools className="flex items-center gap-1">
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          multiple
+          accept=".pdf,.txt,.md,.csv,.json,.ts,.js,.py,.doc,.docx,.png,.jpg,.jpeg,.webp,.sh"
+          onChange={handleFileChange}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach files (PDF, images, documents, code)"
+          className="relative inline-flex items-center justify-center size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-95"
+          aria-label="Attach files"
+        >
+          <PaperclipIcon className="size-4" strokeWidth={1.85} />
+          {totalAttachmentCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-foreground text-[10px] font-bold text-background ring-2 ring-card">
+              {totalAttachmentCount}
+            </span>
+          )}
+        </button>
+        <VoiceDictation
+          onTranscript={onVoiceTranscript}
+          disabled={isGenerating}
+          className="h-8 px-2.5 rounded-full text-xs"
+        />
+        {isGroup && bots.length > 1 && (
+          <PromptInputSelect
+            value={selectedBotId}
+            onValueChange={(val: any) => {
+              if (typeof val === "string") {
+                onSelectBot(val)
+              }
+            }}
+          >
+            <PromptInputSelectTrigger className="h-8 min-w-[130px] max-w-[180px] gap-2 px-2.5 text-xs font-medium border border-border/70 dark:border-white/[0.08] bg-muted/50 dark:bg-white/[0.04] hover:bg-muted dark:hover:bg-white/[0.08] text-foreground transition-colors rounded-full cursor-pointer ml-1">
+              <ChatAvatar
+                seed={selectedBot?.avatar || selectedBot?.name || ""}
+                className="size-4 rounded-full shrink-0"
+              />
+              <span className="truncate flex-1 text-left">
+                {selectedBot?.name ?? "Pick bot"}
+              </span>
+              <span className="size-1.5 rounded-full bg-cyan-500 shrink-0" />
+            </PromptInputSelectTrigger>
+            <PromptInputSelectContent className="w-64 border-border bg-popover text-popover-foreground p-1.5 shadow-xl">
+              {bots.map((b) => (
+                <PromptInputSelectItem
+                  key={b.id}
+                  value={b.id}
+                  className="cursor-pointer rounded-md py-2 px-2 hover:bg-accent/60"
+                >
+                  <div className="flex items-center gap-2.5 w-full">
+                    <ChatAvatar
+                      seed={b.avatar || b.name}
+                      className="size-5 rounded-full shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-medium text-xs text-foreground truncate">
+                          {b.name}
+                        </span>
+                        <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-500/10 px-1 rounded border border-cyan-500/20">
+                          Ready
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground truncate">
+                        {b.job}
+                      </span>
+                    </div>
+                  </div>
+                </PromptInputSelectItem>
+              ))}
+            </PromptInputSelectContent>
+          </PromptInputSelect>
+        )}
+      </PromptInputTools>
+
+      <button
+        type="submit"
+        disabled={!isGenerating && !canSubmit}
+        onClick={(e) => {
+          if (isGenerating) {
+            e.preventDefault()
+            onStop()
+          }
+        }}
+        aria-label={isGenerating ? "Stop generating" : "Send message"}
+        title={isGenerating ? "Stop generating" : "Send message"}
+        className={cn(
+          "inline-flex items-center justify-center size-8 rounded-full transition-all duration-150 select-none shrink-0",
+          isGenerating || canSubmit
+            ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer active:scale-95"
+            : "bg-muted/70 dark:bg-white/[0.08] text-muted-foreground/45 cursor-not-allowed"
+        )}
+      >
+        {isGenerating ? (
+          <Square className="size-3 fill-current rounded-[2px]" />
+        ) : (
+          <ArrowUp className="size-4 stroke-[2.25]" />
+        )}
+      </button>
+    </PromptInputFooter>
   )
 }
 
@@ -420,10 +621,30 @@ function ChatView({
     }
   }, [uniqueMessages, selectedBotId, onSelectBot])
 
+  const buildMessageMetadata = React.useCallback(
+    () => ({
+      chatId,
+      botId: selectedBot?.id,
+      botName: selectedBot?.name,
+      botJob: selectedBot?.job,
+      botInstructions: selectedBot?.instructions ?? "",
+      sandboxId: selectedBot?.sandboxId ?? "",
+      isGroup,
+      chatName: chat?.name ?? (isGroup ? "Group Chat" : undefined),
+      groupMembers: bots.map((b) => ({
+        id: b.id,
+        name: b.name,
+        job: b.job,
+        instructions: b.instructions ?? undefined,
+      })),
+    }),
+    [chatId, selectedBot, isGroup, chat?.name, bots]
+  )
+
   return (
     <div className="relative flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-background">
       <Conversation className="flex-1 min-h-0 overflow-y-auto">
-        <ConversationContent className="mx-auto w-full max-w-4xl lg:max-w-5xl py-6 px-4 sm:px-6 space-y-6">
+        <ConversationContent className="mx-auto w-full max-w-3xl lg:max-w-4xl py-6 px-4 sm:px-6 space-y-6">
           {uniqueMessages.length === 0 ? (
             <ConversationEmptyState>
               <div className="flex flex-col items-center gap-4 max-w-md mx-auto py-8">
@@ -446,8 +667,8 @@ function ChatView({
                     {isGroup
                       ? `Featuring ${bots.map((b) => b.name).join(", ")}. Pick a bot below or attach a document to start.`
                       : bot?.job
-                      ? `${bot.job} — Ready to help you with your work.`
-                      : "Send a message or attach a file to get started."}
+                        ? `${bot.job} — Ready to help you with your work.`
+                        : "Send a message or attach a file to get started."}
                   </p>
                 </div>
 
@@ -464,14 +685,17 @@ function ChatView({
                   <button
                     type="button"
                     onClick={() => {
-                      sendMessage({
-                        parts: [
-                          {
-                            type: "text",
-                            text: "Search for high-resolution images of modern AI computing clusters and summarize key specs.",
-                          },
-                        ],
-                      })
+                      sendMessage(
+                        {
+                          parts: [
+                            {
+                              type: "text",
+                              text: "Search for high-resolution images of modern AI computing clusters and summarize key specs.",
+                            },
+                          ],
+                        },
+                        { metadata: buildMessageMetadata() }
+                      )
                     }}
                     className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
                   >
@@ -591,142 +815,25 @@ function ChatView({
                       {/* Compact file badges from experimental_attachments */}
                       {expAttachments.map((att, attIdx) => {
                         if (att.url && partUrls.has(att.url)) return null
-                        const isPdf =
-                          att.contentType === "application/pdf" ||
-                          att.name?.toLowerCase().endsWith(".pdf")
-                        const isImage = att.contentType?.startsWith("image/")
-                        const isCode = /\.(ts|js|py|json|csv|md|txt)$/i.test(att.name)
-
-                        if (isImage && att.url) {
-                          return (
-                            <div
-                              key={`exp-att-${attIdx}`}
-                              className="rounded-xl overflow-hidden border border-border/60 bg-black/40 max-w-sm mt-1"
-                            >
-                              <img
-                                src={att.url}
-                                alt={att.name || "Uploaded image"}
-                                className="max-h-60 w-auto object-contain rounded-lg"
-                              />
-                              {att.name && (
-                                <div className="px-2.5 py-1 text-[11px] font-mono text-muted-foreground truncate border-t border-border/40">
-                                  {att.name}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        }
-
                         return (
-                          <div
+                          <UserAttachmentItem
                             key={`exp-att-${attIdx}`}
-                            className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/80 p-2.5 max-w-sm shadow-xs mt-1"
-                          >
-                            <div
-                              className={cn(
-                                "flex size-9 items-center justify-center rounded-lg shrink-0",
-                                isPdf
-                                  ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                                  : isCode
-                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                  : "bg-cyan-500/10 text-cyan-500 border border-cyan-500/20"
-                              )}
-                            >
-                              {isPdf ? (
-                                <FileText className="size-4.5" strokeWidth={1.75} />
-                              ) : isCode ? (
-                                <FileCode2 className="size-4.5" strokeWidth={1.75} />
-                              ) : (
-                                <File className="size-4.5" strokeWidth={1.75} />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="block truncate text-xs font-semibold text-foreground">
-                                {att.name || "Attachment"}
-                              </span>
-                              <span className="block text-[10px] text-muted-foreground uppercase font-mono">
-                                {isPdf ? "PDF Document" : isCode ? "Code / Data" : att.contentType || "File"}
-                              </span>
-                            </div>
-                            {att.url && (
-                              <a
-                                href={att.url}
-                                download={att.name || "document"}
-                                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
-                                title="Download attachment"
-                              >
-                                <Download className="size-3.5" strokeWidth={1.75} />
-                              </a>
-                            )}
-                          </div>
+                            name={att.name || "Attachment"}
+                            contentType={att.contentType}
+                            url={att.url}
+                          />
                         )
                       })}
 
                       {message.parts.map((part, index) => {
                         if (part.type === "file") {
-                          const isPdf =
-                            part.mediaType === "application/pdf" ||
-                            (part as any).filename?.toLowerCase().endsWith(".pdf")
-                          const isImage = part.mediaType?.startsWith("image/")
-
-                          if (isImage && (part as any).url) {
-                            return (
-                              <div
-                                key={index}
-                                className="rounded-xl overflow-hidden border border-border/60 bg-black/40 max-w-sm mt-1"
-                              >
-                                <img
-                                  src={(part as any).url}
-                                  alt={(part as any).filename || "Uploaded image"}
-                                  className="max-h-60 w-auto object-contain rounded-lg"
-                                />
-                                {(part as any).filename && (
-                                  <div className="px-2.5 py-1 text-[11px] font-mono text-muted-foreground truncate border-t border-border/40">
-                                    {(part as any).filename}
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          }
-
                           return (
-                            <div
+                            <UserAttachmentItem
                               key={index}
-                              className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/80 p-2.5 max-w-sm shadow-xs mt-1"
-                            >
-                              <div
-                                className={cn(
-                                  "flex size-9 items-center justify-center rounded-lg shrink-0",
-                                  isPdf
-                                    ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                                    : "bg-cyan-500/10 text-cyan-500 border border-cyan-500/20"
-                                )}
-                              >
-                                {isPdf ? (
-                                  <FileText className="size-4.5" strokeWidth={1.75} />
-                                ) : (
-                                  <File className="size-4.5" strokeWidth={1.75} />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <span className="block truncate text-xs font-semibold text-foreground">
-                                  {(part as any).filename || "Document"}
-                                </span>
-                                <span className="block text-[10px] text-muted-foreground uppercase font-mono">
-                                  {isPdf ? "PDF Document" : part.mediaType || "Document"}
-                                </span>
-                              </div>
-                              {(part as any).url && (
-                                <a
-                                  href={(part as any).url}
-                                  download={(part as any).filename || "document"}
-                                  className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
-                                  title="Download attachment"
-                                >
-                                  <Download className="size-3.5" strokeWidth={1.75} />
-                                </a>
-                              )}
-                            </div>
+                              name={(part as any).filename || "Document"}
+                              contentType={part.mediaType}
+                              url={(part as any).url}
+                            />
                           )
                         }
 
@@ -863,30 +970,23 @@ function ChatView({
           )}
 
           {status === "submitted" && (
-            <div className="flex w-full items-center gap-3 text-sm pl-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="relative shrink-0">
-                <ChatAvatar
-                  seed={selectedBot?.avatar || selectedBot?.name || botAvatar}
-                  alt={selectedBot?.name || botName}
-                  className="size-8 rounded-xl shadow-xs ring-2 ring-cyan-500/30 ring-offset-2 ring-offset-background animate-pulse"
-                />
-                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-cyan-500 ring-2 ring-background animate-ping" />
-                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-cyan-500 ring-2 ring-background" />
-              </div>
-              <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-2.5 shadow-sm backdrop-blur-md">
-                <div className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-cyan-500 animate-bounce [animation-delay:-0.3s] shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-                  <span className="size-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:-0.15s] shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
-                  <span className="size-2 rounded-full bg-cyan-300 animate-bounce shadow-[0_0_8px_rgba(6,182,212,0.4)]" />
+            <div className="flex w-full items-center gap-3 text-sm animate-in fade-in duration-200">
+              <ChatAvatar
+                seed={selectedBot?.avatar || selectedBot?.name || botAvatar}
+                alt={selectedBot?.name || botName}
+                className="size-8 rounded-xl shrink-0 shadow-xs border border-border/50"
+              />
+              <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <span className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-foreground tracking-wide">
-                    {isGroup && selectedBot?.name
-                      ? `${selectedBot.name} is thinking...`
-                      : `${botName} is thinking...`}
-                  </span>
-                  <span className="inline-block size-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                </div>
+                <span className="font-medium text-muted-foreground">
+                  {isGroup && selectedBot?.name
+                    ? `${selectedBot.name} is thinking...`
+                    : `${botName} is thinking...`}
+                </span>
               </div>
             </div>
           )}
@@ -897,13 +997,13 @@ function ChatView({
                 <AlertCircle className="size-4 shrink-0 text-destructive mt-0.5" strokeWidth={1.75} />
                 <span className="leading-snug">
                   {error.message?.includes("Tool result is missing") ||
-                  error.message?.includes("MissingToolResultsError")
+                    error.message?.includes("MissingToolResultsError")
                     ? "The previous action completed. Please click Retry to continue."
                     : error.message?.includes("Minified React error") ||
                       error.message?.includes("Server Components render") ||
                       error.message?.includes("digest")
-                    ? "Could not establish a connection to the chat service. Please check your network and try again."
-                    : error.message ||
+                      ? "Could not establish a connection to the chat service. Please check your network and try again."
+                      : error.message ||
                       "An error occurred while generating the response. Please try again."}
                 </span>
               </div>
@@ -976,9 +1076,8 @@ function ChatView({
               } else if (allFiles.length > 0) {
                 parts.push({
                   type: "text",
-                  text: `Please analyze and summarize the attached ${
-                    allFiles.length === 1 ? allFiles[0].filename : `${allFiles.length} files`
-                  }.`,
+                  text: `Please analyze and summarize the attached ${allFiles.length === 1 ? allFiles[0].filename : `${allFiles.length} files`
+                    }.`,
                 })
               }
 
@@ -992,23 +1091,7 @@ function ChatView({
                   })),
                 } as any,
                 {
-                  metadata: {
-                    chatId,
-                    botId: selectedBot?.id,
-                    botName: selectedBot?.name,
-                    botJob: selectedBot?.job,
-                    botInstructions: selectedBot?.instructions ?? "",
-                    sandboxId: selectedBot?.sandboxId ?? "",
-                    isGroup,
-                    chatName:
-                      chat?.name ?? (isGroup ? "Group Chat" : undefined),
-                    groupMembers: bots.map((b) => ({
-                      id: b.id,
-                      name: b.name,
-                      job: b.job,
-                      instructions: b.instructions ?? undefined,
-                    })),
-                  },
+                  metadata: buildMessageMetadata(),
                 }
               )
               setPromptText("")
@@ -1043,109 +1126,20 @@ function ChatView({
                 className="min-h-[44px] max-h-44 resize-none font-sans text-[15px] leading-6 px-4 pt-3.5 pb-1 placeholder:text-muted-foreground/55 text-foreground border-0 bg-transparent focus:outline-none focus:ring-0"
               />
             </PromptInputBody>
-            <PromptInputFooter className="items-center px-3 pb-2.5 pt-1 justify-between">
-              <PromptInputTools className="flex items-center gap-1">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  multiple
-                  accept=".pdf,.txt,.md,.csv,.json,.ts,.js,.py,.doc,.docx,.png,.jpg,.jpeg,.webp,.sh"
-                  onChange={handleFileChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Attach files (PDF, images, documents, code)"
-                  className="relative inline-flex items-center justify-center size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-95"
-                  aria-label="Attach files"
-                >
-                  <PaperclipIcon className="size-4" strokeWidth={1.85} />
-                  {localAttachments.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-foreground text-[10px] font-bold text-background ring-2 ring-card">
-                      {localAttachments.length}
-                    </span>
-                  )}
-                </button>
-                <VoiceDictation
-                  onTranscript={handleVoiceTranscript}
-                  disabled={isGenerating}
-                  className="h-8 px-2.5 rounded-full text-xs"
-                />
-                {isGroup && bots.length > 1 && (
-                  <PromptInputSelect
-                    value={selectedBotId}
-                    onValueChange={(val: any) => {
-                      if (typeof val === "string") {
-                        onSelectBot(val)
-                      }
-                    }}
-                  >
-                    <PromptInputSelectTrigger className="h-8 min-w-[130px] max-w-[180px] gap-2 px-2.5 text-xs font-medium border border-border/70 dark:border-white/[0.08] bg-muted/50 dark:bg-white/[0.04] hover:bg-muted dark:hover:bg-white/[0.08] text-foreground transition-colors rounded-full cursor-pointer ml-1">
-                      <ChatAvatar
-                        seed={selectedBot?.avatar || selectedBot?.name || ""}
-                        className="size-4 rounded-full shrink-0"
-                      />
-                      <span className="truncate flex-1 text-left">{selectedBot?.name ?? "Pick bot"}</span>
-                      <span className="size-1.5 rounded-full bg-cyan-500 shrink-0" />
-                    </PromptInputSelectTrigger>
-                    <PromptInputSelectContent className="w-64 border-border bg-popover text-popover-foreground p-1.5 shadow-xl">
-                      {bots.map((b) => (
-                        <PromptInputSelectItem key={b.id} value={b.id} className="cursor-pointer rounded-md py-2 px-2 hover:bg-accent/60">
-                          <div className="flex items-center gap-2.5 w-full">
-                            <ChatAvatar
-                              seed={b.avatar || b.name}
-                              className="size-5 rounded-full shrink-0"
-                            />
-                            <div className="flex flex-col min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="font-medium text-xs text-foreground truncate">
-                                  {b.name}
-                                </span>
-                                <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono bg-cyan-500/10 px-1 rounded border border-cyan-500/20">
-                                  Ready
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-muted-foreground truncate">
-                                {b.job}
-                              </span>
-                            </div>
-                          </div>
-                        </PromptInputSelectItem>
-                      ))}
-                    </PromptInputSelectContent>
-                  </PromptInputSelect>
-                )}
-              </PromptInputTools>
-
-              {/* Clean monochrome circular submit/stop button */}
-              <button
-                type="submit"
-                disabled={!isGenerating && !promptText.trim() && localAttachments.length === 0}
-                onClick={(e) => {
-                  if (isGenerating) {
-                    e.preventDefault()
-                    stop()
-                  }
-                }}
-                aria-label={isGenerating ? "Stop generating" : "Send message"}
-                title={isGenerating ? "Stop generating" : "Send message"}
-                className={cn(
-                  "inline-flex items-center justify-center size-8 rounded-full transition-all duration-150 select-none shrink-0",
-                  isGenerating
-                    ? "bg-foreground text-background hover:opacity-85 shadow-sm cursor-pointer active:scale-95"
-                    : (promptText.trim() || localAttachments.length > 0)
-                    ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer active:scale-95"
-                    : "bg-muted/70 dark:bg-white/[0.08] text-muted-foreground/45 cursor-not-allowed"
-                )}
-              >
-                {isGenerating ? (
-                  <Square className="size-3 fill-current rounded-[2px]" />
-                ) : (
-                  <ArrowUp className="size-4 stroke-[2.25]" />
-                )}
-              </button>
-            </PromptInputFooter>
+            <ComposerFooter
+              fileInputRef={fileInputRef}
+              handleFileChange={handleFileChange}
+              localAttachmentCount={localAttachments.length}
+              onVoiceTranscript={handleVoiceTranscript}
+              isGenerating={isGenerating}
+              isGroup={isGroup}
+              bots={bots}
+              selectedBotId={selectedBotId}
+              selectedBot={selectedBot}
+              onSelectBot={onSelectBot}
+              promptText={promptText}
+              onStop={stop}
+            />
           </PromptInput>
         </div>
       </div>
@@ -1399,7 +1393,7 @@ export function ToolGroupView({
     : null
 
   return (
-    <div className="w-full max-w-2xl my-1.5 not-prose">
+    <div className="w-full max-w-3xl my-1.5 not-prose">
       {/* Sleek Gemini / ChatGPT style activity toggle bar */}
       <button
         type="button"
@@ -1452,13 +1446,14 @@ export function ToolGroupView({
 
       {/* Expanded timeline view */}
       {isOpen && (
-        <div className="mt-1.5 ml-2.5 pl-3 border-l-2 border-border/60 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="mt-1.5 ml-2.5 pl-3 border-l-2 border-border/60 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
           {parts.map((p, idx) => (
             <ToolPartView
               key={p.toolCallId || `part-${idx}`}
               part={p}
               sourceBot={sourceBot}
               onSelectBot={onSelectBot}
+              nested
             />
           ))}
         </div>
@@ -1471,10 +1466,12 @@ export function ToolPartView({
   part,
   sourceBot,
   onSelectBot,
+  nested = false,
 }: {
   part: any
   sourceBot?: any
   onSelectBot?: (botId: string) => void
+  nested?: boolean
 }) {
   const toolName = getToolName(part)
   const [isOpen, setIsOpen] = React.useState(part.state !== "output-available")
@@ -1634,7 +1631,7 @@ export function ToolPartView({
   if (toolName === "bash") {
     const { title, icon } = getToolDisplayInfo(toolName, part.input)
     return (
-      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-1 max-w-2xl">
+      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} nested={nested}>
         <ToolHeader
           title={title}
           type={part.type as any}
@@ -1688,7 +1685,7 @@ export function ToolPartView({
     const { title, icon } = getToolDisplayInfo(toolName, part.input)
     const images = (part.output as any)?.images || []
     return (
-      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-1 max-w-2xl">
+      <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} nested={nested}>
         <ToolHeader
           title={title}
           type={part.type as any}
@@ -1734,7 +1731,7 @@ export function ToolPartView({
   // 6. All other tools (readFile, writeFile, listFiles, mouse, keyboard)
   const { title, icon } = getToolDisplayInfo(toolName, part.input)
   return (
-    <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} className="my-1 max-w-2xl">
+    <Tool open={isOpen} onOpenChange={setIsOpen} state={part.state} nested={nested}>
       <ToolHeader
         title={title}
         type={part.type as any}
