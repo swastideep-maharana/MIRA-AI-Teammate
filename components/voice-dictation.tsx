@@ -247,24 +247,24 @@ export function VoiceDictation({
       }
       aria-label={isListening ? "Stop voice dictation" : "Start voice dictation"}
       className={cn(
-        "relative inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-full text-xs font-medium transition-all cursor-pointer shadow-2xs select-none active:scale-95 shrink-0",
+        "group relative inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full text-xs font-medium transition-colors cursor-pointer select-none active:scale-95 shrink-0",
         isListening
-          ? "border border-rose-500/50 bg-rose-500/15 text-rose-600 dark:text-rose-400 hover:bg-rose-500/25 shadow-[0_0_12px_rgba(244,63,94,0.25)]"
-          : "border border-border/80 bg-secondary/80 hover:bg-secondary text-foreground hover:text-cyan-400 hover:border-cyan-500/50",
+          ? "border border-rose-500/40 bg-rose-500/15 text-rose-500 hover:bg-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.2)]"
+          : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-white/[0.08]",
         className
       )}
     >
       {isListening ? (
         <>
           <AudioLines className="size-3.5 text-rose-500 animate-pulse shrink-0" strokeWidth={2} />
-          <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+          <span className="text-xs font-semibold text-rose-500">
             Listening...
           </span>
           <Square className="size-2.5 fill-current text-rose-500 shrink-0 ml-0.5" />
         </>
       ) : (
         <>
-          <Mic className="size-3.5 text-muted-foreground group-hover:text-cyan-400 transition-colors shrink-0" strokeWidth={1.75} />
+          <Mic className="size-3.5 shrink-0" strokeWidth={1.75} />
           <span className="text-xs font-medium hidden sm:inline">Dictate</span>
         </>
       )}

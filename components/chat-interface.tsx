@@ -937,10 +937,10 @@ function ChatView({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="border-t border-border bg-background/95 backdrop-blur-md p-3 sm:p-4 shrink-0">
-        <div className="mx-auto w-full max-w-4xl lg:max-w-5xl">
+      <div className="bg-gradient-to-t from-background via-background/95 to-transparent px-3 pb-3.5 pt-2 sm:px-6 sm:pb-5 shrink-0">
+        <div className="mx-auto w-full max-w-3xl lg:max-w-4xl">
           <PromptInput
-            className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/95 dark:bg-card/90 shadow-xl shadow-black/10 dark:shadow-black/40 backdrop-blur-xl focus-within:border-cyan-500/60 focus-within:ring-2 focus-within:ring-cyan-500/20 transition-all duration-200 overflow-hidden"
+            className="rounded-[24px] border border-border/80 dark:border-white/[0.1] bg-card dark:bg-[#171a20] shadow-[0_6px_28px_-8px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_36px_-10px_rgba(0,0,0,0.65)] focus-within:border-foreground/25 dark:focus-within:border-white/[0.22] focus-within:shadow-[0_8px_34px_-8px_rgba(0,0,0,0.16)] dark:focus-within:shadow-[0_14px_40px_-10px_rgba(0,0,0,0.75)] transition-all duration-200 overflow-hidden"
             accept=".pdf,.doc,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.webp"
             multiple
             globalDrop
@@ -1037,14 +1037,14 @@ function ChatView({
                 onChange={(e) => setPromptText(e.target.value)}
                 placeholder={
                   isGroup
-                    ? `Message ${selectedBot?.name ?? "group"}... (drop files or dictate)`
-                    : `Message ${botName}... (drop files or dictate)`
+                    ? `Message ${selectedBot?.name ?? "group"}...`
+                    : `Message ${botName}...`
                 }
-                className="min-h-[50px] max-h-48 resize-none font-sans text-sm sm:text-base leading-relaxed px-4 py-3 placeholder:text-muted-foreground/50 border-0 bg-transparent focus:outline-none focus:ring-0"
+                className="min-h-[44px] max-h-44 resize-none font-sans text-[15px] leading-6 px-4 pt-3.5 pb-1 placeholder:text-muted-foreground/55 text-foreground border-0 bg-transparent focus:outline-none focus:ring-0"
               />
             </PromptInputBody>
             <PromptInputFooter className="items-center px-3 pb-2.5 pt-1 justify-between">
-              <PromptInputTools className="flex items-center gap-2">
+              <PromptInputTools className="flex items-center gap-1">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -1057,12 +1057,12 @@ function ChatView({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Attach files (PDF, images, documents, code)"
-                  className="relative inline-flex items-center justify-center size-8 sm:size-9 rounded-full border border-border/80 bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer group active:scale-95 shadow-2xs"
+                  className="relative inline-flex items-center justify-center size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-95"
                   aria-label="Attach files"
                 >
-                  <PaperclipIcon className="size-4 text-muted-foreground group-hover:text-cyan-400 group-hover:scale-110 transition-all" strokeWidth={2} />
+                  <PaperclipIcon className="size-4" strokeWidth={1.85} />
                   {localAttachments.length > 0 && (
-                    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-black ring-2 ring-background">
+                    <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-foreground text-[10px] font-bold text-background ring-2 ring-card">
                       {localAttachments.length}
                     </span>
                   )}
@@ -1070,7 +1070,7 @@ function ChatView({
                 <VoiceDictation
                   onTranscript={handleVoiceTranscript}
                   disabled={isGenerating}
-                  className="h-8 sm:h-9 px-3 rounded-full text-xs"
+                  className="h-8 px-2.5 rounded-full text-xs"
                 />
                 {isGroup && bots.length > 1 && (
                   <PromptInputSelect
@@ -1081,7 +1081,7 @@ function ChatView({
                       }
                     }}
                   >
-                    <PromptInputSelectTrigger className="h-8 min-w-[140px] max-w-[190px] gap-2 px-2.5 text-xs font-medium border border-border/80 bg-secondary/70 hover:bg-secondary text-foreground transition-colors rounded-full shadow-2xs cursor-pointer">
+                    <PromptInputSelectTrigger className="h-8 min-w-[130px] max-w-[180px] gap-2 px-2.5 text-xs font-medium border border-border/70 dark:border-white/[0.08] bg-muted/50 dark:bg-white/[0.04] hover:bg-muted dark:hover:bg-white/[0.08] text-foreground transition-colors rounded-full cursor-pointer ml-1">
                       <ChatAvatar
                         seed={selectedBot?.avatar || selectedBot?.name || ""}
                         className="size-4 rounded-full shrink-0"
@@ -1118,7 +1118,7 @@ function ChatView({
                 )}
               </PromptInputTools>
 
-              {/* Modern ChatGPT/Claude style circular submit button */}
+              {/* Clean monochrome circular submit/stop button */}
               <button
                 type="submit"
                 disabled={!isGenerating && !promptText.trim() && localAttachments.length === 0}
@@ -1131,18 +1131,18 @@ function ChatView({
                 aria-label={isGenerating ? "Stop generating" : "Send message"}
                 title={isGenerating ? "Stop generating" : "Send message"}
                 className={cn(
-                  "inline-flex items-center justify-center size-8 sm:size-9 rounded-full transition-all duration-200 select-none shrink-0",
+                  "inline-flex items-center justify-center size-8 rounded-full transition-all duration-150 select-none shrink-0",
                   isGenerating
-                    ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer active:scale-95"
+                    ? "bg-foreground text-background hover:opacity-85 shadow-sm cursor-pointer active:scale-95"
                     : (promptText.trim() || localAttachments.length > 0)
-                    ? "bg-cyan-500 hover:bg-cyan-400 text-black shadow-md shadow-cyan-500/25 cursor-pointer active:scale-95"
-                    : "bg-muted text-muted-foreground/40 cursor-not-allowed"
+                    ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer active:scale-95"
+                    : "bg-muted/70 dark:bg-white/[0.08] text-muted-foreground/45 cursor-not-allowed"
                 )}
               >
                 {isGenerating ? (
-                  <Square className="size-3.5 fill-current" />
+                  <Square className="size-3 fill-current rounded-[2px]" />
                 ) : (
-                  <ArrowUp className="size-4 stroke-[2.5]" />
+                  <ArrowUp className="size-4 stroke-[2.25]" />
                 )}
               </button>
             </PromptInputFooter>
