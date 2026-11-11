@@ -494,11 +494,33 @@ function StreamdownTd({ children, className, ...props }: any) {
   );
 }
 
+function isSafeImageSrc(src: unknown): src is string {
+  if (typeof src !== "string") return false;
+  const trimmed = src.trim();
+  if (!trimmed || trimmed.startsWith("streamdown:")) return false;
+  return (
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("data:image/") ||
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("/")
+  );
+}
+
 function StreamdownImg({ src, alt, className, ...props }: any) {
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  if (hasError || !src) {
+  if (typeof src === "string" && src.startsWith("streamdown:")) {
+    return (
+      <div className="my-2.5 inline-flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2 text-xs text-muted-foreground animate-pulse">
+        <ImageIcon className="size-4 shrink-0 text-muted-foreground/70" />
+        <span className="truncate">{alt || "Loading image..."}</span>
+      </div>
+    );
+  }
+
+  if (hasError || !isSafeImageSrc(src)) {
     return (
       <div className="my-2.5 inline-flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2 text-xs text-muted-foreground">
         <ImageIcon className="size-4 shrink-0 text-muted-foreground/70" />
@@ -552,8 +574,20 @@ function StreamdownImg({ src, alt, className, ...props }: any) {
 }
 
 function StreamdownA({ href, children, className, ...props }: any) {
+  if (!href || typeof href !== "string" || href.startsWith("streamdown:")) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-0.5 font-medium text-cyan-600 dark:text-cyan-400 underline decoration-cyan-500/40 underline-offset-3",
+          className
+        )}
+      >
+        {children}
+      </span>
+    );
+  }
   const isExternal =
-    href?.startsWith("http://") || href?.startsWith("https://");
+    href.startsWith("http://") || href.startsWith("https://");
   return (
     <a
       href={href}

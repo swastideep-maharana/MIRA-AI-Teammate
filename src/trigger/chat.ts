@@ -133,6 +133,22 @@ export function prunePastScreenshots(messages: any[]): any[] {
   return cloned;
 }
 
+function extractMessageText(m: any): string {
+  if (!m) return "";
+  if (typeof m.content === "string" && m.content) return m.content;
+  if (Array.isArray(m.parts)) {
+    const partsText = m.parts
+      .filter((p: any) => p?.type === "text" && typeof p.text === "string")
+      .map((p: any) => p.text)
+      .join(" ");
+    if (partsText) return partsText;
+  }
+  if (Array.isArray(m.content)) {
+    return m.content.find((p: any) => p?.type === "text")?.text || "";
+  }
+  return "";
+}
+
 /**
  * Sliding window context truncation:
  * Pins the core task definition / first prompt, retains the last 6 active turns,
@@ -142,11 +158,11 @@ export function applySlidingWindowContext(messages: any[]): any[] {
   const MAX_TURNS = 20;
   const RECENT_ACTIVE_TURNS = 6;
 
-  if (messages.length <= MAX_TURNS) {
-    return messages;
+  if (!Array.isArray(messages) || messages.length <= MAX_TURNS) {
+    return Array.isArray(messages) ? messages : [];
   }
 
-  const firstUserIdx = messages.findIndex((m) => m.role === "user");
+  const firstUserIdx = messages.findIndex((m) => m?.role === "user");
   const pinnedFirstMessage = firstUserIdx !== -1 ? messages[firstUserIdx] : messages[0];
   const lastActiveTurns = messages.slice(-RECENT_ACTIVE_TURNS);
 
@@ -160,13 +176,9 @@ export function applySlidingWindowContext(messages: any[]): any[] {
 
   const actionSummaries: string[] = [];
   for (const m of middleTurns) {
+    if (!m) continue;
     if (m.role === "user") {
-      const text =
-        typeof m.content === "string"
-          ? m.content
-          : Array.isArray(m.content)
-          ? m.content.find((p: any) => p.type === "text")?.text
-          : "";
+      const text = extractMessageText(m);
       if (text) {
         actionSummaries.push(`User: "${text.slice(0, 75)}${text.length > 75 ? "..." : ""}"`);
       }
@@ -174,7 +186,7 @@ export function applySlidingWindowContext(messages: any[]): any[] {
       const toolNames: string[] = [];
       if (Array.isArray(m.parts)) {
         for (const p of m.parts) {
-          if (p.type?.includes("tool") || p.type === "tool-call") {
+          if (p?.type?.includes("tool") || p?.type === "tool-call") {
             toolNames.push(p.toolName || p.name || "tool");
           }
         }
@@ -182,12 +194,7 @@ export function applySlidingWindowContext(messages: any[]): any[] {
       if (toolNames.length > 0) {
         actionSummaries.push(`Agent used [${toolNames.join(", ")}]`);
       } else {
-        const text =
-          typeof m.content === "string"
-            ? m.content
-            : Array.isArray(m.content)
-            ? m.content.find((p: any) => p.type === "text")?.text
-            : "";
+        const text = extractMessageText(m);
         if (text) {
           actionSummaries.push(`Agent noted: "${text.slice(0, 75)}${text.length > 75 ? "..." : ""}"`);
         }
@@ -197,10 +204,18 @@ export function applySlidingWindowContext(messages: any[]): any[] {
 
   const compressedSummaryText = `[Context Optimization: ${middleTurns.length} earlier turns compressed into summary to preserve active context window]\nEarlier progress:\n${actionSummaries.slice(0, 10).map((s) => `- ${s}`).join("\n")}`;
 
-  const rollingSummaryMessage = {
-    role: "user",
-    content: compressedSummaryText,
-  };
+  // Emit UIMessage shape (with parts array) when operating on UIMessages so convertToModelMessages never sees undefined parts
+  const isUIMessageFormat = messages.some((m) => Array.isArray(m?.parts));
+  const rollingSummaryMessage = isUIMessageFormat
+    ? {
+        id: "rolling-context-summary",
+        role: "user",
+        parts: [{ type: "text", text: compressedSummaryText }],
+      }
+    : {
+        role: "user",
+        content: compressedSummaryText,
+      };
 
   return [pinnedFirstMessage, rollingSummaryMessage, ...lastActiveTurns];
 }

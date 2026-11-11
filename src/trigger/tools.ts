@@ -47,14 +47,120 @@ export function withTimeout<T>(
 
 function decodeHtmlEntities(str: string): string {
   return str
-    .replace(/&#x27;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&nbsp;/g, " ")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^>]+>/g, " ")
     .trim()
+}
+
+function extractYouTubeVideoId(rawUrl: string): string | null {
+  try {
+    const u = new URL(rawUrl)
+    const host = u.hostname.replace(/^www\./, "").toLowerCase()
+    if (host === "youtu.be") {
+      const id = u.pathname.split("/").filter(Boolean)[0]
+      return id || null
+    }
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+      const vParam = u.searchParams.get("v")
+      if (vParam) return vParam
+      const parts = u.pathname.split("/").filter(Boolean)
+      if ((parts[0] === "shorts" || parts[0] === "embed" || parts[0] === "live") && parts[1]) {
+        return parts[1]
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function formatDurationSeconds(rawSeconds: string | number | undefined): string {
+  const secs = Number(rawSeconds)
+  if (!Number.isFinite(secs) || secs <= 0) return ""
+  const mins = Math.floor(secs / 60)
+  const rem = secs % 60
+  return mins > 0 ? `${mins}m ${rem}s` : `${rem}s`
+}
+
+async function fetchYouTubeVideoContext(videoId: string, originalUrl: string) {
+  const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`
+
+  const [playerResult, oembedResult] = await Promise.allSettled([
+    fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+      method: "POST",
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip",
+      },
+      body: JSON.stringify({
+        context: { client: { clientName: "ANDROID", clientVersion: "20.10.38" } },
+        videoId,
+      }),
+    }).then((r) => (r.ok ? r.json() : null)),
+    fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(canonicalUrl)}&format=json`, {
+      signal: AbortSignal.timeout(6000),
+    }).then((r) => (r.ok ? r.json() : null)),
+  ])
+
+  const player = playerResult.status === "fulfilled" ? playerResult.value : null
+  const oembed = oembedResult.status === "fulfilled" ? oembedResult.value : null
+  const details = player?.videoDetails
+
+  const title = details?.title || oembed?.title || `YouTube Video (${videoId})`
+  const channel = details?.author || oembed?.author_name || ""
+  const duration = formatDurationSeconds(details?.lengthSeconds)
+  const description = typeof details?.shortDescription === "string" ? details.shortDescription.trim() : ""
+
+  let transcript = ""
+  let transcriptLang = ""
+  const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks
+  if (Array.isArray(tracks) && tracks.length > 0) {
+    const preferred =
+      tracks.find((t: any) => typeof t.languageCode === "string" && t.languageCode.startsWith("en") && t.kind !== "asr") ||
+      tracks.find((t: any) => typeof t.languageCode === "string" && t.languageCode.startsWith("en")) ||
+      tracks[0]
+
+    if (preferred?.baseUrl) {
+      transcriptLang = preferred.languageCode || ""
+      try {
+        const capRes = await fetch(preferred.baseUrl, { signal: AbortSignal.timeout(8000) })
+        if (capRes.ok) {
+          const xml = await capRes.text()
+          transcript = decodeHtmlEntities(xml).replace(/\s+/g, " ").trim()
+        }
+      } catch {
+        // Proceed with metadata & description if caption fetch fails
+      }
+    }
+  }
+
+  if (!details && !oembed) {
+    return null
+  }
+
+  const sections: string[] = [
+    `Video Title: ${title}`,
+    channel ? `Channel: ${channel}` : "",
+    duration ? `Duration: ${duration}` : "",
+    description ? `\nDescription:\n${description.slice(0, 2000)}` : "",
+    transcript
+      ? `\nTranscript${transcriptLang ? ` (${transcriptLang})` : ""}:\n${transcript.slice(0, 12000)}`
+      : "\nTranscript: Not available for this video.",
+  ].filter(Boolean)
+
+  return {
+    success: true,
+    url: originalUrl,
+    title,
+    content: sections.join("\n"),
+  }
 }
 
 // Regex patterns for blacklisted dangerous commands in bash
@@ -649,7 +755,7 @@ with urllib.request.urlopen(req) as resp:
 
     fetchUrl: tool({
       description:
-        "Fetch and extract readable text and content from any webpage URL. Returns the page title and cleaned text content.",
+        "Fetch and extract readable text and content from any webpage or YouTube video URL (youtube.com / youtu.be). For webpages, returns the title and cleaned text content; for YouTube URLs, returns the video title, channel, duration, description, and full captions/transcript.",
       inputSchema: z.object({
         url: z.string().url("Must be a valid HTTP or HTTPS URL").max(2000, "URL exceeds 2000 character limit").describe("The HTTP or HTTPS URL to fetch"),
       }),
@@ -666,6 +772,14 @@ with urllib.request.urlopen(req) as resp:
         try {
           return await withTimeout(
             (async () => {
+              const ytVideoId = extractYouTubeVideoId(url)
+              if (ytVideoId) {
+                const ytResult = await fetchYouTubeVideoContext(ytVideoId, url)
+                if (ytResult) {
+                  return ytResult
+                }
+              }
+
               const res = await fetch(url, {
                 signal: AbortSignal.timeout(8000),
                 headers: {

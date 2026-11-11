@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const chatId = body.id || body.chatId
-    const incomingMessages: UIMessage[] = body.messages || []
+    const incomingMessages: UIMessage[] = Array.isArray(body.messages) ? body.messages : []
     const clientData: ChatClientData | undefined = body.clientData
 
     if (!chatId) {
@@ -210,8 +210,34 @@ ${
     const optimizedMessages = prunePastScreenshots(windowedMessages)
     const sanitizedMessages = sanitizeDanglingToolCalls(optimizedMessages)
 
+    // Guarantee every message has a valid UIMessage `parts` array so convertToModelMessages never throws
+    const normalizedUIMessages: UIMessage[] = sanitizedMessages
+      .filter((m: any) => m && typeof m === "object")
+      .map((m: any, idx: number) => {
+        if (Array.isArray(m.parts)) {
+          return {
+            ...m,
+            parts: m.parts.filter((p: any) => p != null && typeof p === "object"),
+          }
+        }
+        const fallbackText =
+          typeof m.content === "string"
+            ? m.content
+            : Array.isArray(m.content)
+            ? m.content
+                .filter((p: any) => p?.type === "text" && typeof p.text === "string")
+                .map((p: any) => p.text)
+                .join("\n")
+            : ""
+        return {
+          id: m.id || `msg-${idx}`,
+          role: m.role || "user",
+          parts: fallbackText ? [{ type: "text", text: fallbackText }] : [],
+        } as UIMessage
+      })
+
     // 5. Convert UIMessages to model messages & ensure all tool calls have results
-    const rawModelMessages = await convertToModelMessages(sanitizedMessages, {
+    const rawModelMessages = await convertToModelMessages(normalizedUIMessages, {
       tools,
       ignoreIncompleteToolCalls: true,
     })
