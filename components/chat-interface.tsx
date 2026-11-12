@@ -395,12 +395,12 @@ function ComposerFooter({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           title="Attach files (PDF, images, documents, code)"
-          className="relative inline-flex items-center justify-center size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-95"
+          className="relative inline-flex items-center justify-center size-8 rounded-lg border border-neutral-200 dark:border-white/[0.1] bg-neutral-50/80 dark:bg-white/[0.04] text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.1] hover:border-neutral-300 dark:hover:border-white/[0.18] transition-colors cursor-pointer active:scale-95"
           aria-label="Attach files"
         >
           <PaperclipIcon className="size-4" strokeWidth={1.85} />
           {totalAttachmentCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-foreground text-[10px] font-bold text-background ring-2 ring-card">
+            <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-neutral-900 dark:bg-white text-[10px] font-bold text-white dark:text-neutral-950 ring-2 ring-white dark:ring-[#1b1c20]">
               {totalAttachmentCount}
             </span>
           )}
@@ -408,7 +408,7 @@ function ComposerFooter({
         <VoiceDictation
           onTranscript={onVoiceTranscript}
           disabled={isGenerating}
-          className="h-8 px-2.5 rounded-full text-xs"
+          className="h-8 px-2.5 rounded-lg text-xs"
         />
         {isGroup && bots.length > 1 && (
           <PromptInputSelect
@@ -474,10 +474,10 @@ function ComposerFooter({
         aria-label={isGenerating ? "Stop generating" : "Send message"}
         title={isGenerating ? "Stop generating" : "Send message"}
         className={cn(
-          "inline-flex items-center justify-center size-8 rounded-full transition-all duration-150 select-none shrink-0",
+          "inline-flex items-center justify-center size-8 rounded-lg transition-all duration-150 select-none shrink-0",
           isGenerating || canSubmit
-            ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer active:scale-95"
-            : "bg-muted/70 dark:bg-white/[0.08] text-muted-foreground/45 cursor-not-allowed"
+            ? "bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 shadow-xs cursor-pointer active:scale-95"
+            : "bg-neutral-200/90 text-neutral-500 dark:bg-white/[0.1] dark:text-neutral-400 cursor-not-allowed"
         )}
       >
         {isGenerating ? (
@@ -1133,7 +1133,7 @@ function ChatView({
       <div className="bg-gradient-to-t from-background via-background/95 to-transparent px-3 pb-3.5 pt-2 sm:px-6 sm:pb-5 shrink-0">
         <div className="mx-auto w-full max-w-3xl lg:max-w-4xl">
           <PromptInput
-            className="rounded-[24px] border border-border/80 dark:border-white/[0.1] bg-card dark:bg-[#171a20] shadow-[0_6px_28px_-8px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_36px_-10px_rgba(0,0,0,0.65)] focus-within:border-foreground/25 dark:focus-within:border-white/[0.22] focus-within:shadow-[0_8px_34px_-8px_rgba(0,0,0,0.16)] dark:focus-within:shadow-[0_14px_40px_-10px_rgba(0,0,0,0.75)] transition-all duration-200 overflow-hidden"
+            className="rounded-[22px] border border-neutral-300/90 dark:border-white/[0.14] bg-white dark:bg-[#1b1c20] shadow-[0_2px_14px_-2px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_12px_36px_-10px_rgba(0,0,0,0.7)] focus-within:border-neutral-400 dark:focus-within:border-white/[0.28] focus-within:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.12)] dark:focus-within:shadow-[0_14px_40px_-10px_rgba(0,0,0,0.8)] transition-all duration-200 overflow-hidden"
             accept=".pdf,.doc,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.webp"
             multiple
             globalDrop
@@ -1216,7 +1216,7 @@ function ChatView({
                     ? `Message ${selectedBot?.name ?? "group"}...`
                     : `Message ${botName}...`
                 }
-                className="min-h-[44px] max-h-44 resize-none font-sans text-[15px] leading-6 px-4 pt-3.5 pb-1 placeholder:text-muted-foreground/55 text-foreground border-0 bg-transparent focus:outline-none focus:ring-0"
+                className="min-h-[48px] max-h-44 resize-none font-sans text-[15px] leading-6 px-4 pt-3.5 pb-1.5 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 text-neutral-900 dark:text-neutral-100 border-0 bg-transparent focus:outline-none focus:ring-0"
               />
             </PromptInputBody>
             <ComposerFooter

@@ -247,10 +247,10 @@ export function VoiceDictation({
       }
       aria-label={isListening ? "Stop voice dictation" : "Start voice dictation"}
       className={cn(
-        "group relative inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full text-xs font-medium transition-colors cursor-pointer select-none active:scale-95 shrink-0",
+        "group relative inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition-colors cursor-pointer select-none active:scale-95 shrink-0",
         isListening
           ? "border border-rose-500/40 bg-rose-500/15 text-rose-500 hover:bg-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.2)]"
-          : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-white/[0.08]",
+          : "border border-neutral-200 dark:border-white/[0.1] bg-neutral-50/80 dark:bg-white/[0.04] text-neutral-700 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.1] hover:border-neutral-300 dark:hover:border-white/[0.18]",
         className
       )}
     >
