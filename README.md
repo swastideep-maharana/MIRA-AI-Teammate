@@ -114,6 +114,27 @@ Each agent has direct access to tools executed within its sandbox:
 - Visual recording states: Pulsing recording ring, live audio wave animation, and one-click toggle with Escape key abort support.
 - Permission error handling: Graceful detection and alerts for denied microphone access or unsupported browser runtimes.
 
+### 16. Human-in-the-Loop (HITL) Approval Gates
+- High-risk shell commands (`rm -rf`, `sudo`, `git push`, `curl ... | bash`, `kill -9`, recursive `chmod`/`chown`) are intercepted via AI SDK `needsApproval` before execution.
+- Execution pauses cleanly and renders an inline **Approval Required** card in chat with **Approve & Run** and **Reject** controls, resuming automatically via `addToolApprovalResponse`.
+
+### 17. Agent Telemetry & Cost Dashboard (`/usage`)
+- Interactive observability view backed by `usage_ledgers` in Neon PostgreSQL.
+- Displays total estimated spend (tokens + sandbox compute), input/output token breakdown, active sandbox duration, per-teammate Recharts bar visualization, and recent run logs.
+
+### 18. Structured Deliverable Cards (`publishArtifact`)
+- Agents publish structured engineering deliverables (`qa-report`, `code-diff`, `test-summary`, `runbook`, `prototype-spec`) rendered as interactive cards with copy/preview controls and persisted to `/workspace/deliverables/`.
+
+### 19. Deterministic Agent Eval Suite (`npm run eval`)
+Run `npm run eval` (or `node evals/run-evals.ts`) to verify safety guardrails, context-window compaction, visual history pruning, and multi-agent prompt assembly:
+
+| Eval Case | Verification | Result |
+| --- | --- | --- |
+| HITL High-Risk Command Classifier | Precision & recall on risky vs safe shell commands | 6/6 risky flagged, 5/5 safe allowed |
+| Sliding Window + Tool Pair Sanitization | Compresses >20 turns & repairs dangling tool calls | 26 -> 8 messages, orphan tool-call paired |
+| Ephemeral Visual History | Retains only latest screenshot frame in context | Older frame pruned to text summary |
+| Multi-Agent Group Prompt Assembly | Includes active bot, teammates, handoff, & `MEMORY.md` | 9,800-char prompt verified |
+
 ---
 
 ## Technology Stack

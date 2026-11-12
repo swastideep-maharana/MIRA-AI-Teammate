@@ -1,6 +1,9 @@
 import { tool } from "ai"
 import { z } from "zod"
 import { getDaytona } from "../../lib/daytona"
+import { checkCommandSafety, isHighRiskCommand } from "../../lib/command-safety"
+
+export { isHighRiskCommand }
 
 export type ToolErrorType =
   | "VALIDATION_ERROR"
@@ -161,39 +164,6 @@ async function fetchYouTubeVideoContext(videoId: string, originalUrl: string) {
     title,
     content: sections.join("\n"),
   }
-}
-
-// Regex patterns for blacklisted dangerous commands in bash
-const DANGEROUS_COMMAND_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
-  {
-    pattern: /(?:^|[;&|`$()]\s*)rm\s+(-[a-zA-Z]*[rf][a-zA-Z]*|-r\s+-f|-f\s+-r)\s+(?:\/|\/\*|~\/|~|\$HOME|\.\.|\/\.\.)(?:\s|[;&|]|$)/i,
-    reason: "Destructive root/home recursive deletion is strictly prohibited.",
-  },
-  {
-    pattern: /:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,
-    reason: "Fork bombs and resource-exhaustion commands are prohibited.",
-  },
-  {
-    pattern: /(?:^|[;&|`$()]\s*)(?:>|>>|tee|sed|chmod|chown|rm)\s+.*\/etc\/(?:passwd|shadow|sudoers|pam\.d)/i,
-    reason: "Modifying critical operating system authentication files (/etc/passwd, shadow, sudoers) is prohibited.",
-  },
-  {
-    pattern: /(?:^|[;&|`$()]\s*)(?:mkfs|fdisk|dd\s+.*of=\/dev\/(?:sd[a-z]|nvme|hd[a-z]|null|zero)|rm\s+.*\/boot)/i,
-    reason: "Disk reformatting, raw partition writes, and altering /boot are prohibited.",
-  },
-  {
-    pattern: /(?:^|[;&|`$()]\s*)(?:shutdown|reboot|poweroff|init\s+[06])(?:\s|[;&|]|$)/i,
-    reason: "System shutdown and reboot commands are disabled in this environment.",
-  },
-]
-
-function checkCommandSafety(command: string): { safe: boolean; reason?: string } {
-  for (const item of DANGEROUS_COMMAND_PATTERNS) {
-    if (item.pattern.test(command)) {
-      return { safe: false, reason: item.reason }
-    }
-  }
-  return { safe: true }
 }
 
 const RESTRICTED_WRITE_DIRECTORIES = [
@@ -869,10 +839,14 @@ with urllib.request.urlopen(req) as resp:
 
     bash: tool({
       description:
-        "Run a bash or shell command in the sandbox terminal. Returns standard output and exit code.",
+        "Run a bash or shell command in the sandbox terminal. Returns standard output and exit code. High-risk commands (e.g. rm -rf, git push, sudo, curl|sh) pause for human approval.",
       inputSchema: z.object({
         command: z.string().min(1, "Command must not be empty").max(4000, "Command exceeds 4000 characters limit").describe("The shell command to execute"),
       }),
+      needsApproval: ({ command }) => {
+        if (!checkCommandSafety(command).safe) return false
+        return isHighRiskCommand(command).highRisk
+      },
       execute: async ({ command }) => {
         // 1. Guardrail check for dangerous command patterns
         const safety = checkCommandSafety(command)
@@ -1670,6 +1644,82 @@ with urllib.request.urlopen(req) as resp:
           type: "text",
           value:
             "Memory updated successfully in MEMORY.md. You will remember this across 1:1 and group chats.",
+        }
+      },
+    }),
+
+    publishArtifact: tool({
+      description:
+        "Publish a structured engineering or QA deliverable card in chat (e.g., QA Bug Report, Code Diff Summary, Test Suite Results, or Architecture Runbook) and optionally save it to /workspace/deliverables/.",
+      inputSchema: z.object({
+        title: z.string().min(1).max(160).describe("Short deliverable title"),
+        kind: z
+          .enum(["qa-report", "code-diff", "test-summary", "runbook", "prototype-spec"])
+          .default("qa-report")
+          .describe("Category of deliverable"),
+        summary: z.string().min(1).max(500).describe("1-2 sentence executive summary"),
+        content: z.string().min(1).max(12000).describe("Full markdown body of the deliverable"),
+        filePath: z
+          .string()
+          .optional()
+          .describe("Optional workspace file path, defaults to /workspace/deliverables/<slug>.md"),
+      }),
+      execute: async ({ title, kind, summary, content, filePath }) => {
+        const slug = title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 48) || "deliverable"
+        const resolvedPath = filePath?.trim() || `/workspace/deliverables/${slug}.md`
+
+        const safety = checkPathWriteSafety(resolvedPath)
+        if (!safety.safe) {
+          return createToolFailure(
+            "COMMAND_REJECTED",
+            safety.reason || "Unsafe deliverable path.",
+            "Use a path inside /workspace/deliverables/."
+          )
+        }
+
+        let persistedToSandbox = false
+        try {
+          const sandbox = await getSandbox()
+          await withTimeout(
+            sandbox.process.executeCommand("mkdir -p /workspace/deliverables"),
+            10000,
+            "Creating deliverables directory timed out."
+          )
+          const markdownDoc = `# ${title}\n\n> **Type:** ${kind}\n> **Summary:** ${summary}\n\n${content}\n`
+          await withTimeout(
+            sandbox.fs.uploadFile(Buffer.from(markdownDoc, "utf-8"), resolvedPath),
+            15000,
+            "Writing deliverable file timed out."
+          )
+          persistedToSandbox = true
+        } catch {
+          persistedToSandbox = false
+        }
+
+        return {
+          success: true,
+          title,
+          kind,
+          summary,
+          content,
+          filePath: resolvedPath,
+          persistedToSandbox,
+        }
+      },
+      toModelOutput: ({ output }: { output: any }) => {
+        if (output?.success === false) {
+          return {
+            type: "text",
+            value: `[TOOL_FAILURE: ${output.error_type}]\nDetails: ${output.details}`,
+          }
+        }
+        return {
+          type: "text",
+          value: `Deliverable "${output.title}" (${output.kind}) published${output.persistedToSandbox ? ` and saved to ${output.filePath}` : ""}.`,
         }
       },
     }),

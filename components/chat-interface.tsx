@@ -2,7 +2,12 @@
 
 import * as React from "react"
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, isToolUIPart, type UIMessage } from "ai"
+import {
+  DefaultChatTransport,
+  isToolUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  type UIMessage,
+} from "ai"
 
 import {
   Conversation,
@@ -83,6 +88,12 @@ import {
   ChevronDown,
   Square,
   CheckCircle2,
+  ShieldAlert,
+  Check,
+  Copy,
+  FileCheck2,
+  PlayCircle,
+  Wrench,
 } from "lucide-react"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -500,11 +511,21 @@ function ChatView({
   transport: DefaultChatTransport<UIMessage>
   initialMessages: UIMessage[]
 }) {
-  const { messages, sendMessage, status, stop, error, regenerate, clearError } = useChat({
+  const {
+    messages,
+    sendMessage,
+    addToolApprovalResponse,
+    status,
+    stop,
+    error,
+    regenerate,
+    clearError,
+  } = useChat({
     id: chatId,
     messages: initialMessages,
     transport,
     throttle: 40,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   })
 
   const selectedBot = bots.find((b) => b.id === selectedBotId) ?? bot
@@ -672,16 +693,8 @@ function ChatView({
                   </p>
                 </div>
 
-                {/* Quick starter action cards */}
-                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
-                  >
-                    <FileUp className="size-4 text-cyan-400 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
-                    <span>Attach Document</span>
-                  </button>
+                {/* 1-Click 2026 Workflow Playbooks */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 w-full max-w-lg text-left">
                   <button
                     type="button"
                     onClick={() => {
@@ -690,17 +703,72 @@ function ChatView({
                           parts: [
                             {
                               type: "text",
-                              text: "Search for high-resolution images of modern AI computing clusters and summarize key specs.",
+                              text: "Run a Live Web QA Audit: open https://example.com in Chrome on the X11 desktop (DISPLAY=:0), inspect the layout with viewScreen, verify key elements, and publish a structured QA report with publishArtifact.",
                             },
                           ],
                         },
                         { metadata: buildMessageMetadata() }
                       )
                     }}
-                    className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-secondary/80 hover:bg-secondary px-3.5 py-2 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 hover:text-cyan-400 group active:scale-95"
+                    className="flex items-start gap-2.5 rounded-xl border border-border/80 bg-secondary/60 hover:bg-secondary px-3 py-2.5 text-xs transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 group active:scale-[0.99]"
                   >
-                    <Sparkles className="size-4 text-cyan-400 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
-                    <span>Search Web Images</span>
+                    <Globe className="size-4 text-cyan-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground">Live Web QA Audit</div>
+                      <div className="text-[11px] text-muted-foreground truncate">Launch X11 Chrome + inspect UI</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sendMessage(
+                        {
+                          parts: [
+                            {
+                              type: "text",
+                              text: "Inspect /workspace in the sandbox terminal, list files, check system/runtime tools (python3, node, git), and publish a workspace readiness summary via publishArtifact.",
+                            },
+                          ],
+                        },
+                        { metadata: buildMessageMetadata() }
+                      )
+                    }}
+                    className="flex items-start gap-2.5 rounded-xl border border-border/80 bg-secondary/60 hover:bg-secondary px-3 py-2.5 text-xs transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 group active:scale-[0.99]"
+                  >
+                    <Wrench className="size-4 text-cyan-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground">Sandbox Diagnostics</div>
+                      <div className="text-[11px] text-muted-foreground truncate">Audit /workspace & run checks</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromptText(
+                        "Extract the transcript from this YouTube tech talk and build a working prototype in /workspace: https://youtu.be/"
+                      )
+                    }}
+                    className="flex items-start gap-2.5 rounded-xl border border-border/80 bg-secondary/60 hover:bg-secondary px-3 py-2.5 text-xs transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 group active:scale-[0.99]"
+                  >
+                    <PlayCircle className="size-4 text-cyan-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground">YouTube to Prototype</div>
+                      <div className="text-[11px] text-muted-foreground truncate">Extract transcript + code in VM</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-start gap-2.5 rounded-xl border border-border/80 bg-secondary/60 hover:bg-secondary px-3 py-2.5 text-xs transition-all cursor-pointer shadow-2xs hover:border-cyan-500/50 group active:scale-[0.99]"
+                  >
+                    <FileUp className="size-4 text-cyan-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" strokeWidth={1.75} />
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground">Analyze Spec or Code</div>
+                      <div className="text-[11px] text-muted-foreground truncate">Sync PDF, image, or file to VM</div>
+                    </div>
                   </button>
                 </div>
               </div>
@@ -934,6 +1002,31 @@ function ChatView({
                                 <ReasoningTrigger />
                                 <ReasoningContent>{item.part.text}</ReasoningContent>
                               </Reasoning>
+                            )
+                          }
+
+                          if (item.type === "approval") {
+                            return (
+                              <ToolApprovalCard
+                                key={item.key}
+                                part={item.part}
+                                onRespond={(approved, reason) =>
+                                  addToolApprovalResponse({
+                                    id: item.part.approval.id,
+                                    approved,
+                                    reason,
+                                  })
+                                }
+                              />
+                            )
+                          }
+
+                          if (item.type === "artifact") {
+                            return (
+                              <DeliverableArtifactCard
+                                key={item.key}
+                                output={item.part.output}
+                              />
                             )
                           }
 
@@ -1253,6 +1346,8 @@ export function getToolDisplayInfo(toolName: string, input: any) {
 export type GroupedMessagePart =
   | { type: "text"; text: string; key: string }
   | { type: "reasoning"; part: any; key: string }
+  | { type: "approval"; part: any; key: string }
+  | { type: "artifact"; part: any; key: string }
   | { type: "showScreen"; part: any; key: string }
   | { type: "handoff"; part: any; key: string }
   | { type: "toolGroup"; parts: any[]; key: string }
@@ -1288,7 +1383,17 @@ export function groupMessageParts(parts: any[]): GroupedMessagePart[] {
         // internal only, never rendered in chat
         continue
       }
-      if (
+      if (part.state === "approval-requested" && part.approval?.id) {
+        flushToolGroup()
+        grouped.push({ type: "approval", part, key: `approval-${i}` })
+      } else if (
+        toolName === "publishArtifact" &&
+        part.state === "output-available" &&
+        (part.output as any)?.success
+      ) {
+        flushToolGroup()
+        grouped.push({ type: "artifact", part, key: `artifact-${i}` })
+      } else if (
         toolName === "showScreen" &&
         part.state === "output-available" &&
         (part.output as any)?.screenshot
@@ -1456,6 +1561,130 @@ export function ToolGroupView({
               nested
             />
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ToolApprovalCard({
+  part,
+  onRespond,
+}: {
+  part: any
+  onRespond: (approved: boolean, reason?: string) => void
+}) {
+  const [responded, setResponded] = React.useState<"approved" | "rejected" | null>(null)
+  const toolName = getToolName(part)
+  const commandText =
+    typeof part.input?.command === "string"
+      ? part.input.command
+      : JSON.stringify(part.input ?? {}, null, 2)
+
+  return (
+    <div className="my-2.5 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3.5 shadow-xs">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 text-amber-500">
+          <ShieldAlert className="size-4 shrink-0" strokeWidth={1.85} />
+          <span className="text-xs font-semibold uppercase tracking-wider">
+            Human-in-the-Loop Approval Required
+          </span>
+        </div>
+        <Badge variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-500">
+          {toolName}
+        </Badge>
+      </div>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        This command modifies state or executes a high-risk operation in the sandbox. Review before running:
+      </p>
+      <pre className="mt-2 rounded-lg border border-border bg-muted/60 px-3 py-2 font-mono text-xs text-foreground overflow-x-auto">
+        {commandText}
+      </pre>
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={responded !== null}
+          onClick={() => {
+            setResponded("approved")
+            onRespond(true)
+          }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-slate-950 transition-colors cursor-pointer"
+        >
+          <Check className="size-3.5" strokeWidth={2} />
+          <span>{responded === "approved" ? "Approved" : "Approve & Run"}</span>
+        </button>
+        <button
+          type="button"
+          disabled={responded !== null}
+          onClick={() => {
+            setResponded("rejected")
+            onRespond(false, "User rejected high-risk command execution.")
+          }}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40 disabled:opacity-50 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors cursor-pointer"
+        >
+          <X className="size-3.5" strokeWidth={2} />
+          <span>{responded === "rejected" ? "Rejected" : "Reject"}</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function DeliverableArtifactCard({ output }: { output: any }) {
+  const [expanded, setExpanded] = React.useState(true)
+  const [copied, setCopied] = React.useState(false)
+
+  const handleCopy = () => {
+    if (!output?.content) return
+    navigator.clipboard.writeText(output.content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  return (
+    <div className="my-3 overflow-hidden rounded-xl border border-cyan-500/25 bg-card shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-muted/40 px-3.5 py-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileCheck2 className="size-4 text-cyan-500 shrink-0" strokeWidth={1.85} />
+          <span className="text-xs font-semibold text-foreground truncate">
+            {output?.title || "Deliverable"}
+          </span>
+          <Badge variant="secondary" className="text-[10px] font-mono uppercase">
+            {output?.kind || "report"}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          {output?.filePath && (
+            <span className="hidden sm:inline-block rounded-md bg-background/80 border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+              {output.filePath}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          >
+            {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          >
+            <ChevronDown className={cn("size-3 transition-transform", expanded && "rotate-180")} />
+            <span>{expanded ? "Hide" : "Preview"}</span>
+          </button>
+        </div>
+      </div>
+      {output?.summary && (
+        <div className="px-3.5 py-2 text-xs text-muted-foreground border-b border-border/40 bg-background/40">
+          {output.summary}
+        </div>
+      )}
+      {expanded && output?.content && (
+        <div className="px-3.5 py-3 text-xs leading-relaxed max-h-96 overflow-y-auto">
+          <MessageResponse mode="static">{output.content}</MessageResponse>
         </div>
       )}
     </div>

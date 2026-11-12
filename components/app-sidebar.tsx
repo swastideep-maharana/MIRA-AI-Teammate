@@ -10,6 +10,7 @@ import {
   SearchIcon,
   Trash2Icon,
   UsersIcon,
+  ActivityIcon,
 } from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
 import { formatDistanceToNowStrict } from "date-fns"
@@ -396,7 +397,20 @@ export function AppSidebar({ chats = [], bots = [], ...props }: AppSidebarProps)
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-sidebar-border p-2">
+        <SidebarFooter className="border-t border-sidebar-border p-2 space-y-1">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname === "/usage"}
+                tooltip="Telemetry & Cost"
+                render={<Link href="/usage" />}
+                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ActivityIcon className="size-4 text-cyan-500" />
+                <span>Telemetry & Cost</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
           <div className="flex items-center justify-between w-full group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:justify-center">
             <div className="flex-1 min-w-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
               <SidebarMenuButton
