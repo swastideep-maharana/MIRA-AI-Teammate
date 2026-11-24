@@ -24,7 +24,7 @@ from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, Field
 
 from agent_engine.config import settings
-from agent_engine.graph import build_mira_graph
+from agent_engine.graph import build_mira_graph, create_mcp_client
 from agent_engine.memory import HybridMemoryStore, RetrievedMemory
 
 # 1. Lifespan Manager: Initialize shared async clients ONCE at startup, close cleanly at shutdown
@@ -51,13 +51,15 @@ async def lifespan(app: FastAPI):
     app.state.checkpointer = AsyncPostgresSaver(conn=app.state.checkpointer_pool)
     await app.state.checkpointer.setup()
 
-    # Compile the LangGraph agent with checkpointer
-    app.state.graph = build_mira_graph(
+    # Initialize MCP Client & Compile LangGraph agent
+    app.state.mcp_client = await create_mcp_client()
+    app.state.graph = await build_mira_graph(
         memory_store=app.state.memory_store,
         checkpointer=app.state.checkpointer,
+        mcp_client=app.state.mcp_client,
     )
 
-    print("MIRA Agent Engine started: Gemini client, MemoryStore, & LangGraph Checkpointer initialized.")
+    print("MIRA Agent Engine started: Gemini client, MemoryStore, MCP Client, & LangGraph Checkpointer initialized.")
     yield
     # Shutdown: clean up resources when container receives SIGTERM
     await app.state.memory_store.close()
