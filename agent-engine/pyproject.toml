@@ -10,6 +10,10 @@ requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.165.0",
     "google-genai>=3.6.1",
+    "langchain-core>=1.8.4",
+    "langchain-google-genai>=4.5.2",
+    "langgraph>=1.2.24",
+    "langgraph-checkpoint-postgres>=3.2.1",
     "pgvector>=0.5.1",
     "psycopg[binary,pool]>=3.3.9",
     "pydantic>=2.14.4",
