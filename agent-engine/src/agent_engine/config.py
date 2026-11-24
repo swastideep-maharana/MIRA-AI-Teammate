@@ -6,13 +6,18 @@ load_dotenv()
 
 class Settings(BaseModel):
     gemini_api_key: str = Field(..., min_length=10)
+    database_url: str = Field(..., min_length=10)
     primary_model: str = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-3.5-flash")
     fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
+    embedding_model: str = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
 
 def get_settings() -> Settings:
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
         raise RuntimeError("CRITICAL: GEMINI_API_KEY is missing from environment variables.")
-    return Settings(gemini_api_key=api_key)
+    db_url = os.getenv("DATABASE_URL", "")
+    if not db_url:
+        raise RuntimeError("CRITICAL: DATABASE_URL is missing from environment variables.")
+    return Settings(gemini_api_key=api_key, database_url=db_url)
 
 settings = get_settings()

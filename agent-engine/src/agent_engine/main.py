@@ -1,7 +1,15 @@
 import asyncio
 import json
+import sys
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Literal
+from typing import Any, AsyncGenerator, Literal
+
+if sys.platform == "win32":
+    # On Windows, psycopg async requires a Selector event loop instead of Proactor
+    _set_policy = getattr(asyncio, "set_event_loop_policy", None)
+    _policy_cls = getattr(asyncio, "WindowsSelectorEventLoopPolicy", None)
+    if _set_policy and _policy_cls:
+        _set_policy(_policy_cls())
 
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
@@ -11,15 +19,23 @@ from google.genai.errors import APIError
 from pydantic import BaseModel, Field
 
 from agent_engine.config import settings
+from agent_engine.memory import HybridMemoryStore, RetrievedMemory
 
 # 1. Lifespan Manager: Initialize shared async clients ONCE at startup, close cleanly at shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: attach the Gemini client to app.state so every request reuses the same HTTP connection pool
     app.state.genai_client = genai.Client(api_key=settings.gemini_api_key)
-    print("MIRA Agent Engine started: Gemini client initialized.")
+    app.state.memory_store = HybridMemoryStore(
+        dsn=settings.database_url,
+        genai_client=app.state.genai_client,
+        embedding_model=settings.embedding_model,
+    )
+    await app.state.memory_store.open()
+    print("MIRA Agent Engine started: Gemini client & HybridMemoryStore initialized.")
     yield
     # Shutdown: clean up resources when container receives SIGTERM
+    await app.state.memory_store.close()
     print("MIRA Agent Engine shutting down cleanly.")
 
 app = FastAPI(title="MIRA Agent Engine", lifespan=lifespan)
@@ -108,7 +124,57 @@ async def stream_gemini_response(
     ).to_sse()
 
 
-# 4. HTTP Endpoint
+# 4. Memory Endpoints & Schemas
+class IngestMemoryRequest(BaseModel):
+    org_id: str = Field(..., min_length=1, description="Tenant organization ID")
+    project_id: str = Field(..., min_length=1, description="Project ID")
+    content: str = Field(..., min_length=1)
+    source_type: str = "chat_fact"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class IngestMemoryResponse(BaseModel):
+    id: str
+    status: str = "stored"
+
+
+class SearchMemoryRequest(BaseModel):
+    org_id: str = Field(..., min_length=1, description="Tenant organization ID")
+    project_id: str = Field(..., min_length=1, description="Project ID")
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(default=5, ge=1, le=50)
+
+
+class SearchMemoryResponse(BaseModel):
+    memories: list[RetrievedMemory]
+
+
+@app.post("/api/v1/memory/ingest", response_model=IngestMemoryResponse)
+async def ingest_memory_endpoint(body: IngestMemoryRequest, request: Request):
+    store: HybridMemoryStore = request.app.state.memory_store
+    memory_id = await store.ingest_memory(
+        org_id=body.org_id,
+        project_id=body.project_id,
+        content=body.content,
+        source_type=body.source_type,
+        metadata=body.metadata,
+    )
+    return IngestMemoryResponse(id=memory_id, status="stored")
+
+
+@app.post("/api/v1/memory/search", response_model=SearchMemoryResponse)
+async def search_memory_endpoint(body: SearchMemoryRequest, request: Request):
+    store: HybridMemoryStore = request.app.state.memory_store
+    results = await store.hybrid_search(
+        org_id=body.org_id,
+        project_id=body.project_id,
+        query=body.query,
+        top_k=body.top_k,
+    )
+    return SearchMemoryResponse(memories=results)
+
+
+# 5. Agent Streaming Endpoint
 @app.post("/api/v1/agent/stream")
 async def agent_stream_endpoint(body: AgentRunRequest, request: Request):
     client: genai.Client = request.app.state.genai_client
