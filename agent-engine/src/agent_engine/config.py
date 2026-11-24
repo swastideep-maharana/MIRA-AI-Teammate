@@ -7,9 +7,12 @@ load_dotenv()
 class Settings(BaseModel):
     gemini_api_key: str = Field(..., min_length=10)
     database_url: str = Field(..., min_length=10)
-    primary_model: str = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-3.5-flash")
+    primary_model: str = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-3.5-flash-lite")
     fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
     embedding_model: str = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+    langfuse_public_key: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    langfuse_secret_key: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+    langfuse_host: str = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
 def get_settings() -> Settings:
     api_key = os.getenv("GEMINI_API_KEY", "")

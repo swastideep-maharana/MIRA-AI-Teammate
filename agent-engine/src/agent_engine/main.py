@@ -23,8 +23,11 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, Field
 
+from langfuse.langchain import CallbackHandler
+
 from agent_engine.config import settings
 from agent_engine.graph import build_mira_graph, create_mcp_client
+from agent_engine.guardrails import check_input_guardrails, sanitize_output_text
 from agent_engine.memory import HybridMemoryStore, RetrievedMemory
 
 # 1. Lifespan Manager: Initialize shared async clients ONCE at startup, close cleanly at shutdown
@@ -254,13 +257,13 @@ async def stream_graph_run(
                         if msg.content:
                             yield SSEEvent(
                                 type="token",
-                                content=str(msg.content),
+                                content=sanitize_output_text(str(msg.content)),
                                 session_id=session_id,
                             ).to_sse()
                     elif isinstance(msg, ToolMessage):
                         yield SSEEvent(
                             type="thought",
-                            content=f"Tool output: {msg.content}",
+                            content=f"Tool output: {sanitize_output_text(str(msg.content))}",
                             session_id=session_id,
                         ).to_sse()
 
@@ -280,7 +283,31 @@ async def stream_graph_run(
 # 6. LangGraph Agent Endpoints
 @app.post("/api/v1/agent/run")
 async def agent_run_endpoint(body: AgentRunRequest, request: Request):
+    # Guardrail check: block prompt injections & destructive commands immediately (0 LLM tokens spent)
+    guard = check_input_guardrails(body.prompt)
+    if not guard.allowed:
+        async def blocked_stream() -> AsyncGenerator[str, None]:
+            yield SSEEvent(
+                type="error",
+                content=f"Guardrail violation: {guard.reason}",
+                session_id=body.session_id,
+            ).to_sse()
+
+        return StreamingResponse(
+            blocked_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     graph = request.app.state.graph
+    callbacks = []
+    if settings.langfuse_public_key and settings.langfuse_secret_key:
+        callbacks.append(CallbackHandler())
+
     config = {
         "configurable": {
             "thread_id": body.session_id,
@@ -288,6 +315,11 @@ async def agent_run_endpoint(body: AgentRunRequest, request: Request):
             "project_id": body.project_id,
         },
         "recursion_limit": 10,
+        "callbacks": callbacks,
+        "metadata": {
+            "langfuse_session_id": body.session_id,
+            "langfuse_user_id": body.org_id,
+        },
     }
     input_state = {
         "messages": [HumanMessage(content=body.prompt)],
@@ -309,11 +341,20 @@ async def agent_run_endpoint(body: AgentRunRequest, request: Request):
 @app.post("/api/v1/agent/resume")
 async def agent_resume_endpoint(body: AgentResumeRequest, request: Request):
     graph = request.app.state.graph
+    callbacks = []
+    if settings.langfuse_public_key and settings.langfuse_secret_key:
+        callbacks.append(CallbackHandler())
+
     config = {
         "configurable": {
             "thread_id": body.session_id,
         },
         "recursion_limit": 10,
+        "callbacks": callbacks,
+        "metadata": {
+            "langfuse_session_id": body.session_id,
+            "langfuse_user_id": body.org_id,
+        },
     }
 
     # Security check: verify tenant org_id matches the checkpointed state

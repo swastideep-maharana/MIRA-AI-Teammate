@@ -8,6 +8,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, StructuredTool, tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -67,7 +68,7 @@ async def create_mcp_client() -> MultiServerMCPClient:
 
 async def build_mira_graph(
     memory_store: HybridMemoryStore,
-    checkpointer: AsyncPostgresSaver,
+    checkpointer: BaseCheckpointSaver,
     mcp_client: MultiServerMCPClient,
 ):
     @tool
